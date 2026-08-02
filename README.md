@@ -38,7 +38,7 @@ FleetForge is structured as a relational database application emphasizing strict
 
 1. Clone the repository:
 ```bash
-git clone [https://github.com/YOUR_USERNAME/fleetforge.git](https://github.com/YOUR_USERNAME/fleetforge.git)
+git clone https://github.com/onkhida/fleetforge
 cd fleetforge
 ```
 2. Install dependencies using `uv`:
