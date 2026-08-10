@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }} | FleetForge CDMS{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto text-center py-16 px-4">
+    <!-- Icon Container -->
+    <div class="inline-flex w-16 h-16 bg-slate-100 text-slate-400 rounded-2xl items-center justify-center mb-6">
+        <i data-lucide="constructor" class="w-8 h-8 text-brand-800"></i>
+    </div>
+    
+    <!-- Header -->
+    <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">{{ title }}</h1>
+    <p class="text-slate-500 mt-2.5 max-w-md mx-auto">
+        The {{ title }} view is part of the next development phase (Batch 2). The shell configuration and UI controls are fully loaded.
+    </p>
+
+    <!-- Navigation Action -->
+    <div class="mt-8 flex justify-center space-x-4">
+        <a href="/dashboard/" class="inline-flex items-center justify-center px-5 py-2.5 bg-brand-800 text-white rounded-xl text-sm font-semibold hover:bg-brand-900 transition shadow-md shadow-brand-800/10">
+            <i data-lucide="arrow-left" class="w-4 h-4 mr-2"></i>
+            Back to Dashboard
+        </a>
+    </div>
+</div>
+
+<script>
+    // Adjust the icons just in case we used a custom icon
+    const iconMap = {
+        'Inventory': 'car',
+        'Customers': 'users',
+        'Sales & POS': 'shopping-cart',
+        'Loans & Finance': 'landmark',
+        'Service & Repairs': 'wrench',
+        'Rentals': 'calendar-range',
+        'Employees': 'shield-alert',
+        'Settings': 'settings',
+        'Help Support': 'help-circle'
+    };
+    
+    const pageTitle = "{{ title }}";
+    const mappedIcon = iconMap[pageTitle] || 'code';
+    
+    // Find the icon in our placeholder box and swap it dynamically
+    const iconEl = document.querySelector('[data-lucide="constructor"]');
+    if (iconEl) {
+        iconEl.setAttribute('data-lucide', mappedIcon);
+        lucide.createIcons();
+    }
+</script>
+{% endblock %}
