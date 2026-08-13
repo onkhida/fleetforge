@@ -1,18 +1,13 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "config/wsgi.py",
-      "use": "@vercel/python",
-      "config": {
-        "includeFiles": "ca.pem"
-      }
+  "functions": {
+    "config/wsgi.py": {
+      "includeFiles": "ca.pem"
     }
-  ],
-  "routes": [
+  },
+  "rewrites": [
     {
-      "src": "/(.*)",
-      "dest": "config/wsgi.py"
+      "source": "/(.*)",
+      "destination": "config/wsgi.py"
     }
   ]
 }
