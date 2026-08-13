@@ -30,9 +30,9 @@ SECRET_KEY = os.getenv("SECRET_KEY", "fallback-dev-key")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DEBUG", "True") == "True"
 
-# ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = ["*"]
 # In config/settings.py
-ALLOWED_HOSTS = [".vercel.app", "localhost", "127.0.0.1"]
+# ALLOWED_HOSTS = [".vercel.app", "localhost", "127.0.0.1"]
 
 # Application definition
 
@@ -145,10 +145,10 @@ STATIC_URL = "static/"
 
 # Add allowed frontend domains
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",                  # React local development
-    "http://localhost:5173",                  # Vite React dev origin
-    "http://127.0.0.1:5173",                  # Vite React dev IP origin
-    "https://fleetforge-client.vercel.app",         # React hosted URL
+    "http://localhost:3000",  # React local development
+    "http://localhost:5173",  # Vite React dev origin
+    "http://127.0.0.1:5173",  # Vite React dev IP origin
+    "https://fleetforge-client.vercel.app",  # React hosted URL
 ]
 
 # Allow credentials (session cookies) to be passed across domains
@@ -163,7 +163,7 @@ CSRF_TRUSTED_ORIGINS = [
 
 # Cookie settings for cross-origin production session support (HTTPS on Vercel)
 if not DEBUG:
-    SESSION_COOKIE_SAMESITE = 'None'
+    SESSION_COOKIE_SAMESITE = "None"
     SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SAMESITE = 'None'
+    CSRF_COOKIE_SAMESITE = "None"
     CSRF_COOKIE_SECURE = True
