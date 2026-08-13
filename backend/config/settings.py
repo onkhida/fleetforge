@@ -146,8 +146,24 @@ STATIC_URL = "static/"
 # Add allowed frontend domains
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",                  # React local development
-    "https://fleetforge.vercel.app",         # React hosted URL
+    "http://localhost:5173",                  # Vite React dev origin
+    "http://127.0.0.1:5173",                  # Vite React dev IP origin
+    "https://fleetforge-client.vercel.app",         # React hosted URL
 ]
 
 # Allow credentials (session cookies) to be passed across domains
 CORS_ALLOW_CREDENTIALS = True
+
+# CSRF Trusted Origins for cross-origin forms
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://fleetforge-client.vercel.app",  # Production React app CSRF whitelist
+]
+
+# Cookie settings for cross-origin production session support (HTTPS on Vercel)
+if not DEBUG:
+    SESSION_COOKIE_SAMESITE = 'None'
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SAMESITE = 'None'
+    CSRF_COOKIE_SECURE = True

@@ -297,6 +297,31 @@ def api_customers_credit_check(request):
     except DatabaseError as e:
         return JsonResponse({"error": f"Database error: {str(e)}"}, status=500)
 
+def api_customers_search(request):
+    """GET /api/customers/search/?q=name - Search customers by first or last name."""
+    if request.method != "GET":
+        return JsonResponse({"error": "Method not allowed."}, status=405)
+        
+    query = request.GET.get("q", "")
+    try:
+        with connection.cursor() as cursor:
+            if query:
+                cursor.execute(
+                    "SELECT customer_id, first_name, last_name, email, phone, national_id, credit_status "
+                    "FROM Customer WHERE first_name LIKE %s OR last_name LIKE %s",
+                    [f"%{query}%", f"%{query}%"]
+                )
+            else:
+                cursor.execute(
+                    "SELECT customer_id, first_name, last_name, email, phone, national_id, credit_status "
+                    "FROM Customer"
+                )
+            customers = dictfetchall(cursor)
+            return JsonResponse({"customers": customers})
+    except DatabaseError as e:
+        return JsonResponse({"error": f"Database error: {str(e)}"}, status=500)
+
+
 # ----------------------------------------------------
 # Module 4: POS Checkout & Trade-Ins
 # ----------------------------------------------------

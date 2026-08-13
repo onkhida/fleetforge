@@ -20,6 +20,7 @@ urlpatterns = [
     path("api/customers/onboard/", views.api_customers_onboard, name="api_customers_onboard"),
     path("api/customers/portfolio/", views.api_customers_portfolio, name="api_customers_portfolio"),
     path("api/customers/credit-check/", views.api_customers_credit_check, name="api_customers_credit_check"),
+    path("api/customers/search/", views.api_customers_search, name="api_customers_search"),
     
     # Module 4: POS Checkout
     path("api/sales/checkout/", views.api_sales_checkout, name="api_sales_checkout"),
