@@ -42,10 +42,13 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
+    "corsheaders",
     "django.contrib.staticfiles",
+    "config",
 ]
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -139,3 +142,12 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = "static/"
+
+# Add allowed frontend domains
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",                  # React local development
+    "https://fleetforge.vercel.app",         # React hosted URL
+]
+
+# Allow credentials (session cookies) to be passed across domains
+CORS_ALLOW_CREDENTIALS = True
