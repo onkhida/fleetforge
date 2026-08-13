@@ -1,0 +1,269 @@
+This itemised endpoint blueprint is designed specifically for your decoupled **Django REST (JSON API) + Shadcn React (Frontend)** architecture. 
+
+Every endpoint is mapped directly to the database views, functions, triggers, and stored procedures in your **`car-dealership-clean-v6.sql`** database schema, fully grounded in the functional requirements and strict business rules of your dealership system.
+
+---
+
+### Module 1: Auth & Session Management (Role-Based Route Guards)
+These endpoints establish who is logged in and what they are allowed to see on the Shadcn frontend based on their mapped enterprise role.
+
+#### `POST /api/auth/login/`
+*   **Purpose:** Authenticates database staff members and retrieves their application access permissions.
+*   **Database Operation (Raw SQL):**
+    ```sql
+    SELECT employee_id, showroom_id, first_name, last_name, role, is_active 
+    FROM Employee 
+    WHERE email = %s AND is_active = TRUE;
+    ```
+*   **System Boundary / Rule:** 
+    *   Must verify `is_active = TRUE` to prevent deactivated employees from logging in.
+    *   The returned `role` ('Admin', 'Manager', 'Salesperson', 'Tech', 'Finance') must be saved in the client's session to dynamically toggle visibility of Shadcn dashboard tabs and enforce route guards.
+
+---
+
+### Module 2: Vehicle Inventory Module (Showroom Floor)
+Feeds the searchable car catalog and handles transfers between physical branches.
+
+```
+GET /api/inventory/ ─────────> Returns available stock using CURRENT_INVENTORY view
+POST /api/inventory/transfer/ ─> Requests showroom-to-showroom transfer via Transfer_Log
+```
+
+#### `GET /api/inventory/`
+*   **Purpose:** Fetches the entire vehicle stock list to populate the primary Shadcn `<DataTable />`.
+*   **Database Operation (Raw SQL):**
+    ```sql
+    SELECT vin, make, model, year, color, status, showroom_name, listing_price, mileage 
+    FROM CURRENT_INVENTORY;
+    ```
+*   **System Boundary / Rule:** 
+    *   For **Salespeople** and **Managers**, append a `WHERE showroom_name = %s` filter. Showrooms are isolated; staff members cannot see the operations of other showrooms unless they are a global **System Admin**.
+
+#### `POST /api/inventory/transfer/`
+*   **Purpose:** Initiates a stock transfer request to move a vehicle from one branch to another.
+*   **Request Payload:** `{ vin, target_showroom_id, employee_id }`
+*   **Database Operation (Raw SQL):**
+    ```sql
+    INSERT INTO Inventory_Transfer (vin, source_showroom_id, target_showroom_id, employee_id, status)
+    VALUES (%s, (SELECT showroom_id FROM Vehicle WHERE vin = %s), %s, %s, 'Pending');
+    ```
+*   **System Boundary / Rule:** 
+    *   **FR-1 / FR-8:** Only **Showroom Managers** and **Admins** have write permissions on the `Inventory_Transfer` table.
+    *   This logs a `'Pending'` transfer. It is only set to `'Completed'` (which triggers the physical `showroom_id` update on the `Vehicle` table) once approved by the target showroom's manager.
+
+#### `GET /api/inventory/metrics/`
+*   **Purpose:** Feeds summary statistic cards at the top of the inventory screen (e.g., total valuation, stock counts).
+*   **Database Operation (Raw SQL):**
+    ```sql
+    SELECT total_vehicles, available_count, reserved_count, sold_count, rented_count, in_service_count, available_inventory_value 
+    FROM vw_showroom_inventory 
+    WHERE showroom_id = %s;
+    ```
+
+---
+
+### Module 3: Customer Management & Portfolios
+Maintains customer profiles and checks credit statuses before transactions.
+
+#### `POST /api/customers/onboard/`
+*   **Purpose:** Registers a new buyer or renter in the system.
+*   **Request Payload:** `{ first_name, last_name, email, phone, national_id }`
+*   **Database Operation (Raw SQL):**
+    ```sql
+    INSERT INTO Customer (first_name, last_name, email, phone, national_id, credit_status)
+    VALUES (%s, %s, %s, %s, %s, 'Approved');
+    ```
+*   **System Boundary / Rule:** 
+    *   **BR-2:** A customer's details must be fully onboarded with a unique ID *before* any sale, rental, or finance transaction is processed.
+
+#### `GET /api/customers/portfolio/?id=<customer_id>`
+*   **Purpose:** Pulls an audit of a customer's lifetime historical purchases, active loans, and repair invoices.
+*   **Database Operation (Raw SQL):**
+    *   Query 1 (Sales): `SELECT * FROM Sale WHERE customer_id = %s;`
+    *   Query 2 (Servicing): `SELECT * FROM Service_Job WHERE customer_id = %s;`
+    *   Query 3 (Rentals): `SELECT * FROM Rental_Agreement WHERE customer_id = %s;`
+
+#### `GET /api/customers/credit-check/?id=<customer_id>`
+*   **Purpose:** Checks the credit status and outstanding debts of a customer before generating a contract.
+*   **Database Operation (Raw SQL):**
+    ```sql
+    SELECT credit_status, 
+           (SELECT COALESCE(SUM(principal_balance), 0) FROM Loan WHERE customer_id = %s AND status = 'Active') AS active_debt
+    FROM Customer 
+    WHERE customer_id = %s;
+    ```
+*   **System Boundary / Rule:** 
+    *   **BR-3:** Customers with a `'Restricted'` credit status (flagged due to active defaults or unpaid balances) are blocked from new loans. 
+    *   **BR-13:** If they have outstanding debts, financing is rejected.
+
+---
+
+### Module 4: POS Checkout & Trade-Ins
+The point-of-sale checkout system that processes car sales, logs customer trade-ins, and calculates commissions.
+
+```
+POST /api/sales/checkout/ ───> Executes sp_ProcessCarSale transaction sequence
+```
+
+#### `POST /api/sales/checkout/`
+*   **Purpose:** Processes a vehicle sale. If a customer is trading in a car, it captures that vehicle, applies credit, and structures a financing plan if selected.
+*   **Request Payload:**
+    ```json
+    {
+      "vin": "1HGCM...",
+      "customer_id": 1,
+      "employee_id": 3,
+      "showroom_id": 1,
+      "sale_date": "2026-08-13",
+      "final_price": 105000.00,
+      "trade_in_allowance": 15000.00,
+      "traded_in_vin": "1HDCP...",
+      "traded_in_make": "Kia",
+      "traded_in_model": "Sportage",
+      "traded_in_year": 2018,
+      "traded_in_color": "Gray",
+      "traded_in_mileage": 40700,
+      "is_financed": true,
+      "down_payment": 45000.00,
+      "interest_rate": 8.5,
+      "term_months": 12
+    }
+    ```
+*   **Database Operation (Raw SQL):**
+    Calls your master stored procedure directly inside a transactional block:
+    ```sql
+    CALL sp_ProcessCarSale(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+    ```
+*   **System Boundary / Rule Constraints:**
+    *   **BR-6:** Rejects the transaction if the vehicle's status is not `'Available'` (`trg_before_sale_validate`).
+    *   **BR-1:** Enforces that a vehicle cannot be sold from a showroom other than the one where it is physically located.
+    *   **BR-13:** Enforces a **minimum 40% down payment** and a **maximum 12-month installment schedule**.
+    *   **BR-7:** Automatically calculates the salesperson's dynamic commission based on their database-stored commission rate.
+    *   **Trade-in Ingestion:** Instantly inserts the traded-in vehicle into inventory as `'Available'` with an estimated retail price marked up by 20% (`trade_in_allowance * 1.2`).
+
+---
+
+### Module 5: In-House Financing (BHPH) & Repayments
+Populates the Finance Manager's portal to track outstanding debts and collect customer payments.
+
+#### `GET /api/finance/loans/`
+*   **Purpose:** Fetches all outstanding customer loans to populate the amortization queue.
+*   **Database Operation (Raw SQL):**
+    ```sql
+    SELECT loan_id, sale_id, customer_id, customer_name, credit_status, principal_amount, 
+           down_payment, principal_balance, amount_paid, pct_paid_off, interest_rate, 
+           term_months, status, start_date, cleared_payments 
+    FROM vw_active_loans_overview;
+    ```
+
+#### `GET /api/finance/eligibility/`
+*   **Purpose:** Evaluates maximum financing capacity on the checkout form.
+*   **Database Operation (Raw SQL):**
+    ```sql
+    SELECT fn_GetLoanEligibleAmount(%s, %s) AS max_eligible_loan;
+    ```
+
+#### `POST /api/finance/payments/`
+*   **Purpose:** Logs a monthly payment against an active loan.
+*   **Request Payload:** `{ loan_id, amount, payment_method, receipt_status }`
+*   **Database Operation (Raw SQL):**
+    ```sql
+    CALL sp_ProcessLoanPayment(%s, %s, %s, %s);
+    ```
+*   **System Boundary / Rule Constraints:**
+    *   **BR-12:** Enforces that payments must map to an active loan contract.
+    *   **BR-13:** Limits installments strictly to 12 months.
+    *   **Automatic Payoff:** The stored procedure automatically transitions the loan status to `'Paid_Off'` when the remaining `principal_balance` reaches zero.
+
+---
+
+### Module 6: Vehicle Service Bay (Maintenance Tracking)
+Fires up work orders, aggregates parts and labor costs, and manages active warranty claims.
+
+```
+POST /api/service/jobs/ ────────> Registers service work order
+POST /api/service/line-items/ ──> Triggers auto-calculation of total costs
+```
+
+#### `POST /api/service/jobs/`
+*   **Purpose:** Registers a service job work order.
+*   **Request Payload:** `{ vin, customer_id, employee_id, showroom_id, odometer_reading }`
+*   **Database Operation (Raw SQL):**
+    ```sql
+    INSERT INTO Service_Job (vin, customer_id, employee_id, showroom_id, odometer_reading, status)
+    VALUES (%s, %s, %s, %s, %s, 'In_Progress');
+    ```
+*   **System Boundary / Rule Constraints:**
+    *   **Showroom Check:** The `trg_ValidateServiceJobShowroom` trigger validates that the technician (`employee_id`) is physically assigned to the showroom where the work order is logged.
+
+#### `POST /api/service/line-items/`
+*   **Purpose:** Appends labor or parts to an active service job.
+*   **Request Payload:** `{ service_job_id, description, labor_cost, parts_cost, payor_type }`
+*   **Database Operation (Raw SQL):**
+    ```sql
+    INSERT INTO Service_Line_Item (service_job_id, description, labor_cost, parts_cost, payor_type)
+    VALUES (%s, %s, %s, %s, %s);
+    ```
+*   **System Boundary / Rule Constraints:**
+    *   **Auto-Cost Calculation:** Adding a line item fires `trg_UpdateServiceJobTotalCost`, which recalculates and updates the `total_cost` on the parent `Service_Job` automatically.
+    *   If `payor_type` is `'Warranty_Claim'`, the frontend should query the vehicle's warranties first to confirm coverage validity.
+
+#### `GET /api/service/warranty-lookup/`
+*   **Purpose:** Checks if a vehicle's active coverage is valid based on its current mileage.
+*   **Database Operation (Raw SQL):**
+    ```sql
+    SELECT warranty_id, coverage_type, provider, end_date, mileage_limit 
+    FROM Warranty 
+    WHERE vin = %s AND end_date >= CURDATE() AND mileage_limit > %s;
+    ```
+*   **System Boundary / Rule Constraints:**
+    *   **BR-9 / BR-10:** Rejects service claims if the current service date or odometer reading exceeds the warranty threshold.
+
+---
+
+### Module 7: Rental Lease Operations
+Coordinates lease agreements, return processing, and late return fine calculations.
+
+#### `POST /api/rentals/lease/`
+*   **Purpose:** Opens a short-term rental lease.
+*   **Request Payload:** `{ vin, customer_id, employee_id, start_date, expected_end_date, daily_rate }`
+*   **Database Operation (Raw SQL):**
+    ```sql
+    INSERT INTO Rental_Agreement (vin, customer_id, employee_id, start_date, expected_end_date, daily_rate, status)
+    VALUES (%s, %s, %s, %s, %s, %s, 'Active');
+    ```
+*   **System Boundary / Rule Constraints:**
+    *   **BR-4:** The `chk_rental_maxdays` table constraint and `trg_rental_business_rules` trigger enforce a strict **maximum duration of 180 days (6 months)**.
+    *   **Double-Booking Check:** Rejects the booking if the vehicle is currently rented, reserved, or sold.
+
+#### `GET /api/rentals/calculate-fine/`
+*   **Purpose:** Dynamically computes late fees on your return screen as the check-in clerk edits dates.
+*   **Database Operation (Raw SQL):**
+    ```sql
+    SELECT fn_CalculateRentalFine(%s, %s) AS dynamic_fine;
+    ```
+
+#### `POST /api/rentals/return/`
+*   **Purpose:** Closes a rental lease, computes the final fine, and updates vehicle status.
+*   **Request Payload:** `{ rental_id, actual_return_date, return_condition, is_damaged }`
+*   **Database Operation (Raw SQL):**
+    ```sql
+    CALL sp_ProcessRentalReturn(%s, %s, %s, %s);
+    ```
+*   **System Boundary / Rule Constraints:**
+    *   **BR-5 / BR-14:** Automatically calculates a **3% daily late fee** on the total lease value.
+    *   If `is_damaged` is set to `TRUE`, the procedure automatically transitions the vehicle's status to `'Service'`. If returned in good condition, it is instantly set back to `'Available'`.
+
+---
+
+### Executive & Showroom Analytics (Admins & Managers Only)
+These analytical queries are designed to feed Shadcn charts, reports, and administrative summaries.
+
+| Endpoint | Target Component | Database Source (Raw SQL) |
+| :--- | :--- | :--- |
+| `GET /api/analytics/commissions/` | Salesperson Commission Ledger | `SELECT * FROM vw_employee_commission_summary;` |
+| `GET /api/analytics/overdue-leases/` | Overdue Alert Dashboard | `SELECT * FROM vw_overdue_rentals;` |
+| `GET /api/analytics/sales-growth/` | Monthly Revenue Growth Charts | `SELECT * FROM EMPLOYEE_SALES_PERFORMANCE;` |
+| `GET /api/analytics/profit-margins/` | Gross Profit Analysis (Admins Only) | `SELECT vin, make, model, purchase_price, listing_price, gross_profit, profit_margin_pct FROM vw_profit_margins;` (from logs) |
+
+***
