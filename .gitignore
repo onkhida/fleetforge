@@ -23,11 +23,11 @@ staticfiles/
 .env
 .env.*
 
-# Certificates & Keys
-ca.pem
-*.pem
-*.crt
-*.key
+# # Certificates & Keys
+# ca.pem
+# *.pem
+# *.crt
+# *.key
 
 # IDEs & OS Files
 .vscode/
