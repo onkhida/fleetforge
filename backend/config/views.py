@@ -154,12 +154,15 @@ def api_inventory_transfer(request):
         
     try:
         with connection.cursor() as cursor:
-            # Check if vehicle exists and retrieve its current showroom
-            cursor.execute("SELECT showroom_id FROM Vehicle WHERE vin = %s", [vin])
+            # Check if vehicle exists and retrieve its current showroom and status
+            cursor.execute("SELECT showroom_id, status FROM Vehicle WHERE vin = %s", [vin])
             row = cursor.fetchone()
             if not row:
                 return JsonResponse({"error": f"Vehicle with VIN '{vin}' does not exist in inventory."}, status=404)
-            source_showroom_id = row[0]
+            source_showroom_id, status = row
+            
+            if status != "Available":
+                return JsonResponse({"error": f"Cannot transfer vehicle '{vin}' because its current status is '{status}'. Only 'Available' vehicles can be transferred."}, status=400)
             
             # Insert a pending transfer log
             cursor.execute(
@@ -341,6 +344,40 @@ def api_customers_delete(request):
         # Returns database level constraints errors (foreign key references)
         return JsonResponse({"error": f"Cannot delete customer: {str(e)}"}, status=400)
 
+@csrf_exempt
+def api_customers_update(request):
+    """POST /api/customers/update/ - Update an existing customer profile."""
+    if request.method != "POST":
+        return JsonResponse({"error": "Method not allowed."}, status=405)
+        
+    data = get_post_data(request)
+    customer_id = data.get("customer_id")
+    first_name = data.get("first_name")
+    last_name = data.get("last_name")
+    email = data.get("email")
+    phone = data.get("phone")
+    national_id = data.get("national_id")
+    credit_status = data.get("credit_status") or "Approved"
+    
+    if not customer_id or not first_name or not last_name or not email or not phone or not national_id:
+        return JsonResponse({"error": "Missing required fields: customer_id, first_name, last_name, email, phone, and national_id."}, status=400)
+        
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT customer_id FROM Customer WHERE customer_id = %s", [customer_id])
+            if not cursor.fetchone():
+                return JsonResponse({"error": f"Customer with ID {customer_id} not found."}, status=404)
+                
+            cursor.execute(
+                "UPDATE Customer "
+                "SET first_name = %s, last_name = %s, email = %s, phone = %s, national_id = %s, credit_status = %s "
+                "WHERE customer_id = %s",
+                [first_name, last_name, email, phone, national_id, credit_status, customer_id]
+            )
+            return JsonResponse({"message": f"Customer profile {customer_id} successfully updated."})
+    except DatabaseError as e:
+        return JsonResponse({"error": f"Transaction failed: {str(e)}"}, status=400)
+
 
 
 # ----------------------------------------------------
@@ -476,7 +513,26 @@ def api_finance_payments(request):
 
 @csrf_exempt
 def api_service_jobs(request):
-    """POST /api/service/jobs/ - Log a new service work order."""
+    """GET /api/service/jobs/ - List all service jobs; POST /api/service/jobs/ - Log a new service work order."""
+    if request.method == "GET":
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT sj.service_job_id, sj.vin, sj.service_date, sj.odometer_reading, sj.status, sj.total_cost, "
+                    "c.first_name AS customer_first, c.last_name AS customer_last, "
+                    "e.first_name AS employee_first, e.last_name AS employee_last, "
+                    "sr.name AS showroom_name "
+                    "FROM Service_Job sj "
+                    "JOIN Customer c ON sj.customer_id = c.customer_id "
+                    "JOIN Employee e ON sj.employee_id = e.employee_id "
+                    "JOIN Showroom sr ON sj.showroom_id = sr.showroom_id "
+                    "ORDER BY sj.service_date DESC"
+                )
+                jobs = dictfetchall(cursor)
+                return JsonResponse({"jobs": jobs})
+        except DatabaseError as e:
+            return JsonResponse({"error": f"Database error: {str(e)}"}, status=500)
+
     if request.method != "POST":
         return JsonResponse({"error": "Method not allowed."}, status=405)
         
@@ -718,3 +774,404 @@ def api_analytics_profit_margins(request):
             return JsonResponse({"profit_margins": margins})
     except DatabaseError as e:
         return JsonResponse({"error": f"Database error: {str(e)}"}, status=500)
+
+
+# ====================================================
+# ENTERPRISE CRUD BRIDGE ENHANCEMENTS
+# ====================================================
+
+# 1. Staff Directory Operations
+def api_employees_list(request):
+    """GET /api/employees/ - List all employees."""
+    if request.method != "GET":
+        return JsonResponse({"error": "Method not allowed."}, status=405)
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT e.employee_id, e.showroom_id, e.first_name, e.last_name, e.email, e.phone, e.role, "
+                "e.commission_rate, e.hire_date, e.is_active, s.name AS showroom_name "
+                "FROM Employee e JOIN Showroom s ON e.showroom_id = s.showroom_id"
+            )
+            employees = dictfetchall(cursor)
+            return JsonResponse({"employees": employees})
+    except DatabaseError as e:
+        return JsonResponse({"error": f"Database error: {str(e)}"}, status=500)
+
+@csrf_exempt
+@require_role(["Admin", "Manager"])
+def api_employees_add(request):
+    """POST /api/employees/add/ - Hire/register new employee."""
+    if request.method != "POST":
+        return JsonResponse({"error": "Method not allowed."}, status=405)
+    data = get_post_data(request)
+    showroom_id = data.get("showroom_id")
+    first_name = data.get("first_name")
+    last_name = data.get("last_name")
+    email = data.get("email")
+    phone = data.get("phone")
+    role = data.get("role")
+    commission_rate = data.get("commission_rate") or 0.05
+
+    if not showroom_id or not first_name or not last_name or not email or not role:
+        return JsonResponse({"error": "Missing fields: showroom_id, first_name, last_name, email, and role are required."}, status=400)
+    
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO Employee (showroom_id, first_name, last_name, email, phone, role, commission_rate, hire_date, is_active) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, CURDATE(), TRUE)",
+                [showroom_id, first_name, last_name, email, phone, role, commission_rate]
+            )
+            return JsonResponse({"message": f"Employee {first_name} {last_name} successfully registered in system."})
+    except DatabaseError as e:
+        return JsonResponse({"error": f"Database error: {str(e)}"}, status=400)
+
+# 2. Showroom Management
+def api_showrooms_list(request):
+    """GET /api/showrooms/ - List all showrooms."""
+    if request.method != "GET":
+        return JsonResponse({"error": "Method not allowed."}, status=405)
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT showroom_id, name, address, phone, email FROM Showroom")
+            showrooms = dictfetchall(cursor)
+            return JsonResponse({"showrooms": showrooms})
+    except DatabaseError as e:
+        return JsonResponse({"error": f"Database error: {str(e)}"}, status=500)
+
+@csrf_exempt
+@require_role(["Admin"])
+def api_showrooms_add(request):
+    """POST /api/showrooms/add/ - Onboard a new showroom branch."""
+    if request.method != "POST":
+        return JsonResponse({"error": "Method not allowed."}, status=405)
+    data = get_post_data(request)
+    name = data.get("name")
+    address = data.get("address")
+    phone = data.get("phone")
+    email = data.get("email")
+
+    if not name or not address:
+        return JsonResponse({"error": "Showroom name and address are required."}, status=400)
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO Showroom (name, address, phone, email) VALUES (%s, %s, %s, %s)",
+                [name, address, phone, email]
+            )
+            return JsonResponse({"message": f"New showroom branch '{name}' successfully registered."})
+    except DatabaseError as e:
+        return JsonResponse({"error": f"Database error: {str(e)}"}, status=400)
+
+# 3. Transaction Registries
+@require_role(["Admin", "Manager"])
+def api_sales_list(request):
+    """GET /api/sales/list/ - Query past vehicle sale records."""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT s.sale_id, s.vin, s.sale_date, s.final_price, s.trade_in_allowance, s.commission_amount, "
+                "c.first_name AS customer_first, c.last_name AS customer_last, "
+                "e.first_name AS employee_first, e.last_name AS employee_last, "
+                "sr.name AS showroom_name "
+                "FROM Sale s "
+                "JOIN Customer c ON s.customer_id = c.customer_id "
+                "JOIN Employee e ON s.employee_id = e.employee_id "
+                "JOIN Showroom sr ON s.showroom_id = sr.showroom_id "
+                "ORDER BY s.sale_date DESC"
+            )
+            sales = dictfetchall(cursor)
+            return JsonResponse({"sales": sales})
+    except DatabaseError as e:
+        return JsonResponse({"error": f"Database error: {str(e)}"}, status=500)
+
+@require_role(["Admin", "Manager"])
+def api_finance_payments_list(request):
+    """GET /api/finance/payments/list/ - Query all loan payment receipts."""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT p.payment_id, p.loan_id, p.payment_date, p.amount, p.payment_method, p.receipt_status, "
+                "c.first_name AS customer_first, c.last_name AS customer_last "
+                "FROM Payment p "
+                "JOIN Loan l ON p.loan_id = l.loan_id "
+                "JOIN Customer c ON l.customer_id = c.customer_id "
+                "ORDER BY p.payment_date DESC"
+            )
+            payments = dictfetchall(cursor)
+            return JsonResponse({"payments": payments})
+    except DatabaseError as e:
+        return JsonResponse({"error": f"Database error: {str(e)}"}, status=500)
+
+# 4. Service Contracts & Claims
+def api_service_warranties(request):
+    """GET /api/service/warranties/ - List all warranties in database."""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT warranty_id, vin, coverage_type, provider, start_date, end_date, mileage_limit FROM Warranty"
+            )
+            warranties = dictfetchall(cursor)
+            return JsonResponse({"warranties": warranties})
+    except DatabaseError as e:
+        return JsonResponse({"error": f"Database error: {str(e)}"}, status=500)
+
+def api_service_warranty_claims(request):
+    """GET /api/service/warranty-claims/ - List all warranty claims."""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT wc.claim_id, wc.line_item_id, wc.warranty_id, wc.claim_date, wc.amount_claimed, wc.status, "
+                "w.provider AS warranty_provider, sli.description AS line_item_description "
+                "FROM Warranty_Claim wc "
+                "JOIN Warranty w ON wc.warranty_id = w.warranty_id "
+                "JOIN Service_Line_Item sli ON wc.line_item_id = sli.line_item_id "
+                "ORDER BY wc.claim_date DESC"
+            )
+            claims = dictfetchall(cursor)
+            return JsonResponse({"warranty_claims": claims})
+    except DatabaseError as e:
+        return JsonResponse({"error": f"Database error: {str(e)}"}, status=500)
+
+# 5. Transfers Approvals & List
+@require_role(["Admin", "Manager"])
+def api_inventory_transfers_list(request):
+    """GET /api/inventory/transfers/ - List all stock transfer requests."""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT t.transfer_id, t.vin, t.transfer_date, t.status, "
+                "s_source.name AS source_showroom_name, "
+                "s_target.name AS target_showroom_name, "
+                "e.first_name, e.last_name "
+                "FROM Inventory_Transfer t "
+                "JOIN Showroom s_source ON t.source_showroom_id = s_source.showroom_id "
+                "JOIN Showroom s_target ON t.target_showroom_id = s_target.showroom_id "
+                "JOIN Employee e ON t.employee_id = e.employee_id "
+                "ORDER BY t.transfer_date DESC"
+            )
+            transfers = dictfetchall(cursor)
+            return JsonResponse({"transfers": transfers})
+    except DatabaseError as e:
+        return JsonResponse({"error": f"Database error: {str(e)}"}, status=500)
+
+@csrf_exempt
+@require_role(["Admin", "Manager"])
+def api_inventory_transfer_approve(request):
+    """POST /api/inventory/transfers/approve/ - Approve a showroom transfer request."""
+    if request.method != "POST":
+        return JsonResponse({"error": "Method not allowed."}, status=405)
+    data = get_post_data(request)
+    transfer_id = data.get("transfer_id")
+    if not transfer_id:
+        return JsonResponse({"error": "transfer_id parameter is required."}, status=400)
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT vin, target_showroom_id, status FROM Inventory_Transfer WHERE transfer_id = %s", [transfer_id])
+            row = cursor.fetchone()
+            if not row:
+                return JsonResponse({"error": f"Transfer with ID {transfer_id} not found."}, status=404)
+            vin, target_showroom_id, status = row
+            if status != "Pending":
+                return JsonResponse({"error": f"Cannot approve transfer with status '{status}'."}, status=400)
+
+            cursor.execute("UPDATE Inventory_Transfer SET status = 'Completed' WHERE transfer_id = %s", [transfer_id])
+            cursor.execute("UPDATE Vehicle SET showroom_id = %s WHERE vin = %s", [target_showroom_id, vin])
+            return JsonResponse({"message": f"Transfer request {transfer_id} successfully approved."})
+    except DatabaseError as e:
+        return JsonResponse({"error": f"Database transaction failed: {str(e)}"}, status=400)
+
+@csrf_exempt
+@require_role(["Admin", "Manager"])
+def api_inventory_transfer_reject(request):
+    """POST /api/inventory/transfers/reject/ - Reject a showroom transfer request."""
+    if request.method != "POST":
+        return JsonResponse({"error": "Method not allowed."}, status=405)
+    data = get_post_data(request)
+    transfer_id = data.get("transfer_id")
+    if not transfer_id:
+        return JsonResponse({"error": "transfer_id parameter is required."}, status=400)
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT status FROM Inventory_Transfer WHERE transfer_id = %s", [transfer_id])
+            row = cursor.fetchone()
+            if not row:
+                return JsonResponse({"error": f"Transfer with ID {transfer_id} not found."}, status=404)
+            if row[0] != "Pending":
+                return JsonResponse({"error": f"Cannot reject transfer with status '{row[0]}'."}, status=400)
+
+            cursor.execute("UPDATE Inventory_Transfer SET status = 'Cancelled' WHERE transfer_id = %s", [transfer_id])
+            return JsonResponse({"message": f"Transfer request {transfer_id} successfully rejected."})
+    except DatabaseError as e:
+        return JsonResponse({"error": f"Database transaction failed: {str(e)}"}, status=400)
+
+# 6. Vehicle Acquisition CRUD
+@csrf_exempt
+@require_role(["Admin", "Manager"])
+def api_inventory_add_vehicle(request):
+    """POST /api/inventory/add/ - Acquire a new vehicle into the fleet."""
+    if request.method != "POST":
+        return JsonResponse({"error": "Method not allowed."}, status=405)
+    data = get_post_data(request)
+    vin = data.get("vin")
+    showroom_id = data.get("showroom_id")
+    make = data.get("make")
+    model = data.get("model")
+    year = data.get("year")
+    color = data.get("color")
+    mileage = data.get("mileage")
+    purchase_price = data.get("purchase_price")
+    listing_price = data.get("listing_price")
+
+    if not vin or not showroom_id or not make or not model or not year or not purchase_price or not listing_price:
+        return JsonResponse({"error": "Missing fields: vin, showroom_id, make, model, year, purchase_price, and listing_price are required."}, status=400)
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT vin FROM Vehicle WHERE vin = %s", [vin])
+            if cursor.fetchone():
+                return JsonResponse({"error": f"Vehicle with VIN '{vin}' already exists in inventory."}, status=400)
+
+            cursor.execute(
+                "INSERT INTO Vehicle (vin, showroom_id, make, model, year, color, mileage, purchase_price, listing_price, status) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'Available')",
+                [vin, showroom_id, make, model, year, color, mileage, purchase_price, listing_price]
+            )
+            return JsonResponse({"message": f"Vehicle with VIN '{vin}' successfully added to available inventory."})
+    except DatabaseError as e:
+        return JsonResponse({"error": f"Database error: {str(e)}"}, status=400)
+
+@csrf_exempt
+@require_role(["Admin", "Manager"])
+def api_employees_update(request):
+    """POST /api/employees/update/ - Update employee profile details."""
+    if request.method != "POST":
+        return JsonResponse({"error": "Method not allowed."}, status=405)
+    data = get_post_data(request)
+    employee_id = data.get("employee_id")
+    first_name = data.get("first_name")
+    last_name = data.get("last_name")
+    email = data.get("email")
+    phone = data.get("phone")
+    role = data.get("role")
+    showroom_id = data.get("showroom_id")
+    commission_rate = data.get("commission_rate")
+    is_active = data.get("is_active")
+    
+    if None in [employee_id, first_name, last_name, email, role, showroom_id, commission_rate]:
+        return JsonResponse({"error": "Missing required fields for employee update."}, status=400)
+        
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE Employee SET first_name=%s, last_name=%s, email=%s, phone=%s, role=%s, showroom_id=%s, commission_rate=%s, is_active=%s "
+                "WHERE employee_id=%s",
+                [first_name, last_name, email, phone, role, showroom_id, commission_rate, 1 if is_active else 0, employee_id]
+            )
+            return JsonResponse({"message": f"Employee {employee_id} updated successfully."})
+    except DatabaseError as e:
+        return JsonResponse({"error": f"Database transaction failed: {str(e)}"}, status=400)
+
+@csrf_exempt
+@require_role(["Admin", "Manager"])
+def api_employees_delete(request):
+    """DELETE /api/employees/delete/?id=<id> - Remove employee from directory."""
+    if request.method != "DELETE":
+        return JsonResponse({"error": "Method not allowed."}, status=405)
+    employee_id = request.GET.get("id")
+    if not employee_id:
+        return JsonResponse({"error": "Employee ID is required."}, status=400)
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("DELETE FROM Employee WHERE employee_id = %s", [employee_id])
+            return JsonResponse({"message": f"Employee {employee_id} deleted successfully."})
+    except DatabaseError as e:
+        return JsonResponse({"error": f"Cannot delete employee: {str(e)}"}, status=400)
+
+@csrf_exempt
+@require_role(["Admin", "Manager"])
+def api_inventory_update(request):
+    """POST /api/inventory/update/ - Update vehicle color, listing price, mileage, status."""
+    if request.method != "POST":
+        return JsonResponse({"error": "Method not allowed."}, status=405)
+    data = get_post_data(request)
+    vin = data.get("vin")
+    listing_price = data.get("listing_price")
+    color = data.get("color")
+    mileage = data.get("mileage")
+    status = data.get("status")
+    
+    if None in [vin, listing_price, color, mileage, status]:
+        return JsonResponse({"error": "Missing required fields for inventory update."}, status=400)
+        
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE Vehicle SET listing_price=%s, color=%s, mileage=%s, status=%s WHERE vin=%s",
+                [listing_price, color, mileage, status, vin]
+            )
+            return JsonResponse({"message": f"Vehicle VIN {vin} details updated successfully."})
+    except DatabaseError as e:
+        return JsonResponse({"error": f"Database transaction failed: {str(e)}"}, status=400)
+
+@csrf_exempt
+@require_role(["Admin", "Manager"])
+def api_inventory_delete(request):
+    """DELETE /api/inventory/delete/?vin=<vin> - Remove vehicle from database."""
+    if request.method != "DELETE":
+        return JsonResponse({"error": "Method not allowed."}, status=405)
+    vin = request.GET.get("vin")
+    if not vin:
+        return JsonResponse({"error": "VIN parameter is required."}, status=400)
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("DELETE FROM Vehicle WHERE vin = %s", [vin])
+            return JsonResponse({"message": f"Vehicle VIN {vin} deleted successfully."})
+    except DatabaseError as e:
+        return JsonResponse({"error": f"Cannot delete vehicle: {str(e)}"}, status=400)
+
+@csrf_exempt
+@require_role(["Admin", "Manager"])
+def api_showrooms_update(request):
+    """POST /api/showrooms/update/ - Update showroom address, name, phone, email."""
+    if request.method != "POST":
+        return JsonResponse({"error": "Method not allowed."}, status=405)
+    data = get_post_data(request)
+    showroom_id = data.get("showroom_id")
+    name = data.get("name")
+    address = data.get("address")
+    phone = data.get("phone")
+    email = data.get("email")
+    
+    if None in [showroom_id, name, address]:
+        return JsonResponse({"error": "Missing required fields for showroom update."}, status=400)
+        
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE Showroom SET name=%s, address=%s, phone=%s, email=%s WHERE showroom_id=%s",
+                [name, address, phone, email, showroom_id]
+            )
+            return JsonResponse({"message": f"Showroom {showroom_id} updated successfully."})
+    except DatabaseError as e:
+        return JsonResponse({"error": f"Database transaction failed: {str(e)}"}, status=400)
+
+@csrf_exempt
+@require_role(["Admin", "Manager"])
+def api_showrooms_delete(request):
+    """DELETE /api/showrooms/delete/?id=<id> - Remove showroom location."""
+    if request.method != "DELETE":
+        return JsonResponse({"error": "Method not allowed."}, status=405)
+    showroom_id = request.GET.get("id")
+    if not showroom_id:
+        return JsonResponse({"error": "Showroom ID parameter is required."}, status=400)
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("DELETE FROM Showroom WHERE showroom_id = %s", [showroom_id])
+            return JsonResponse({"message": f"Showroom {showroom_id} deleted successfully."})
+    except DatabaseError as e:
+        return JsonResponse({"error": f"Cannot delete showroom: {str(e)}"}, status=400)
+

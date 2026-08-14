@@ -64,14 +64,89 @@ const getStatusBadge = (status: string) => {
 // ----------------------------------------------------
 // 1. Inventory Workspace
 // ----------------------------------------------------
-export const InventoryWorkspace = () => {
+export const InventoryWorkspace = ({ employeeShowroomName }: { employeeShowroomName?: string }) => {
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [metrics, setMetrics] = useState<any>(null);
+  const [showrooms, setShowrooms] = useState<any[]>([]);
+  const [transfers, setTransfers] = useState<any[]>([]);
   const [search, setSearch] = useState("");
+  
   const [transferVin, setTransferVin] = useState<string | null>(null);
   const [targetShowroom, setTargetShowroom] = useState("");
+  
+  const [addVehicleOpen, setAddVehicleOpen] = useState(false);
+  const [addShowroomOpen, setAddShowroomOpen] = useState(false);
+  
+  const [newShowroomForm, setNewShowroomForm] = useState({ name: "", address: "", phone: "", email: "" });
+  const [newVehicleForm, setNewVehicleForm] = useState({ vin: "", showroom_id: "", make: "", model: "", year: "", color: "", mileage: "", purchase_price: "", listing_price: "" });
+
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  const [editShowroomForm, setEditShowroomForm] = useState<any>(null);
+  const [editVehicleForm, setEditVehicleForm] = useState<any>(null);
+
+  const handleUpdateShowroom = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editShowroomForm) return;
+    try {
+      const res = await api.updateShowroom({
+        showroom_id: editShowroomForm.showroom_id,
+        name: editShowroomForm.name,
+        address: editShowroomForm.address,
+        phone: editShowroomForm.phone,
+        email: editShowroomForm.email,
+      });
+      setMessage(res.message);
+      setError("");
+      setEditShowroomForm(null);
+      refreshData();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  const handleDeleteShowroom = async (id: number) => {
+    try {
+      const res = await api.deleteShowroom(id);
+      setMessage(res.message);
+      setError("");
+      refreshData();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  const handleUpdateVehicle = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editVehicleForm) return;
+    try {
+      const res = await api.updateVehicle({
+        vin: editVehicleForm.vin,
+        listing_price: parseFloat(editVehicleForm.listing_price),
+        color: editVehicleForm.color,
+        mileage: parseInt(editVehicleForm.mileage),
+        status: editVehicleForm.status,
+      });
+      setMessage(res.message);
+      setError("");
+      setEditVehicleForm(null);
+      refreshData();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  const handleDeleteVehicle = async (vin: string) => {
+    try {
+      const res = await api.deleteVehicle(vin);
+      setMessage(res.message);
+      setError("");
+      refreshData();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
 
   const refreshData = async () => {
     try {
@@ -80,6 +155,12 @@ export const InventoryWorkspace = () => {
       
       const metricsData = await api.getMetrics();
       setMetrics(metricsData.metrics || null);
+
+      const showroomsData = await api.getShowrooms();
+      setShowrooms(showroomsData.showrooms || []);
+
+      const transfersData = await api.getTransfers();
+      setTransfers(transfersData.transfers || []);
     } catch (e: any) {
       setError(e.message);
     }
@@ -94,11 +175,77 @@ export const InventoryWorkspace = () => {
     try {
       const res = await api.transfer(transferVin, parseInt(targetShowroom));
       setMessage(res.message);
+      setError("");
       setTransferVin(null);
       setTargetShowroom("");
       refreshData();
     } catch (e: any) {
       setError(e.message);
+      setMessage("");
+    }
+  };
+
+  const handleApproveTransfer = async (id: number) => {
+    try {
+      const res = await api.approveTransfer(id);
+      setMessage(res.message);
+      setError("");
+      refreshData();
+    } catch (e: any) {
+      setError(e.message);
+      setMessage("");
+    }
+  };
+
+  const handleRejectTransfer = async (id: number) => {
+    try {
+      const res = await api.rejectTransfer(id);
+      setMessage(res.message);
+      setError("");
+      refreshData();
+    } catch (e: any) {
+      setError(e.message);
+      setMessage("");
+    }
+  };
+
+  const handleAddShowroom = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await api.addShowroom(newShowroomForm);
+      setMessage(res.message);
+      setError("");
+      setNewShowroomForm({ name: "", address: "", phone: "", email: "" });
+      setAddShowroomOpen(false);
+      refreshData();
+    } catch (e: any) {
+      setError(e.message);
+      setMessage("");
+    }
+  };
+
+  const handleAddVehicle = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await api.addVehicle({
+        vin: newVehicleForm.vin,
+        showroom_id: parseInt(newVehicleForm.showroom_id),
+        make: newVehicleForm.make,
+        model: newVehicleForm.model,
+        year: parseInt(newVehicleForm.year),
+        color: newVehicleForm.color || undefined,
+        mileage: newVehicleForm.mileage ? parseInt(newVehicleForm.mileage) : undefined,
+        purchase_price: parseFloat(newVehicleForm.purchase_price),
+        listing_price: parseFloat(newVehicleForm.listing_price),
+      });
+      setMessage(res.message);
+      setError("");
+      setNewVehicleForm({ vin: "", showroom_id: "", make: "", model: "", year: "", color: "", mileage: "", purchase_price: "", listing_price: "" });
+      setAddVehicleOpen(false);
+      refreshData();
+    } catch (e: any) {
+      setError(e.message);
+      setMessage("");
     }
   };
 
@@ -110,6 +257,12 @@ export const InventoryWorkspace = () => {
     <div className="space-y-6">
       {error && <div className="p-4 bg-rose-50 text-rose-800 border border-rose-200 rounded-lg text-sm">{error}</div>}
       {message && <div className="p-4 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-sm">{message}</div>}
+
+      {/* Primary Actions Toolbar */}
+      <div className="flex gap-3">
+        <Button onClick={() => setAddVehicleOpen(true)}>Acquire Lot Vehicle</Button>
+        <Button variant="outline" onClick={() => setAddShowroomOpen(true)}>Register Showroom Branch</Button>
+      </div>
 
       {/* Metrics Row */}
       {metrics && (
@@ -160,11 +313,22 @@ export const InventoryWorkspace = () => {
                   <TableCell className="font-medium text-slate-800">{v.make} {v.model}</TableCell>
                   <TableCell>{v.year}</TableCell>
                   <TableCell>{v.color}</TableCell>
-                  <TableCell className="text-slate-600">{v.showroom_name}</TableCell>
+                  <TableCell className="text-slate-600">
+                    <span className="flex items-center gap-1.5">
+                      {v.showroom_name}
+                      {employeeShowroomName && v.showroom_name === employeeShowroomName && (
+                        <Badge className="bg-slate-900 text-white font-normal text-[9px] px-1.5 py-0.5 border-none leading-none shrink-0">Home</Badge>
+                      )}
+                    </span>
+                  </TableCell>
                   <TableCell className="font-medium">{formatCurr(v.listing_price)}</TableCell>
                   <TableCell>{getStatusBadge(v.status)}</TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="outline" size="sm" onClick={() => setTransferVin(v.vin)}>Initiate Transfer</Button>
+                  <TableCell className="text-right space-x-2">
+                    {v.status === "Available" && (
+                      <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setTransferVin(v.vin)}>Transfer</Button>
+                    )}
+                    <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setEditVehicleForm(v)}>Edit</Button>
+                    <Button size="sm" variant="destructive" className="h-8 text-xs" onClick={() => handleDeleteVehicle(v.vin)}>Delete</Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -172,6 +336,89 @@ export const InventoryWorkspace = () => {
           </Table>
         </CardContent>
       </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Showroom Stock Transfers Approval Queue Table */}
+        <Card className="shadow-sm border-slate-200">
+          <CardHeader>
+            <CardTitle className="text-base font-bold text-slate-800">Showroom Stock Transfers Queue</CardTitle>
+            <CardDescription className="text-xs text-slate-400">Review pending transfers between dealership branches.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0 border-t border-slate-100">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>VIN</TableHead>
+                  <TableHead>Source</TableHead>
+                  <TableHead>Target</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {transfers.map((t: any) => (
+                  <TableRow key={t.transfer_id}>
+                    <TableCell className="font-mono text-xs">{t.vin}</TableCell>
+                    <TableCell>{t.source_showroom_name}</TableCell>
+                    <TableCell>{t.target_showroom_name}</TableCell>
+                    <TableCell>{getStatusBadge(t.status)}</TableCell>
+                    <TableCell className="text-right space-x-2">
+                      {t.status === "Pending" ? (
+                        <>
+                          <Button size="sm" variant="outline" className="text-emerald-600 hover:text-emerald-700 h-8" onClick={() => handleApproveTransfer(t.transfer_id)}>Approve</Button>
+                          <Button size="sm" variant="outline" className="text-rose-600 hover:text-rose-700 h-8" onClick={() => handleRejectTransfer(t.transfer_id)}>Reject</Button>
+                        </>
+                      ) : (
+                        <span className="text-xs text-slate-400 font-medium">—</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {transfers.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-6 text-slate-400">No stock transfers logged in the database.</TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        {/* Showrooms Directory */}
+        <Card className="shadow-sm border-slate-200">
+          <CardHeader>
+            <CardTitle className="text-base font-bold text-slate-800">Showrooms Directory</CardTitle>
+            <CardDescription className="text-xs text-slate-400">List of registered active branch showroom locations.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0 border-t border-slate-100">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Showroom ID</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Address</TableHead>
+                  <TableHead>Contact</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {showrooms.map((s: any) => (
+                  <TableRow key={s.showroom_id}>
+                    <TableCell className="font-semibold text-slate-800">Showroom #{s.showroom_id}</TableCell>
+                    <TableCell className="font-medium text-slate-800">{s.name}</TableCell>
+                    <TableCell className="text-slate-600 text-xs">{s.address}</TableCell>
+                    <TableCell className="text-slate-500 text-xs">{s.phone || s.email || "—"}</TableCell>
+                    <TableCell className="text-right space-x-2">
+                      <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setEditShowroomForm(s)}>Edit</Button>
+                      <Button size="sm" variant="destructive" className="h-8 text-xs" onClick={() => handleDeleteShowroom(s.showroom_id)}>Delete</Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Transfer Dialog */}
       <Dialog open={transferVin !== null} onOpenChange={(open) => !open && setTransferVin(null)}>
@@ -188,11 +435,9 @@ export const InventoryWorkspace = () => {
                   <SelectValue placeholder="Select target showroom..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1">Apex Motors North</SelectItem>
-                  <SelectItem value="2">Apex Motors East</SelectItem>
-                  <SelectItem value="3">Apex Motors Kumasi</SelectItem>
-                  <SelectItem value="4">Apex Motors Takoradi</SelectItem>
-                  <SelectItem value="5">Apex Motors West</SelectItem>
+                  {showrooms.map((s) => (
+                    <SelectItem key={s.showroom_id} value={s.showroom_id.toString()}>{s.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -203,13 +448,207 @@ export const InventoryWorkspace = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Acquire Vehicle Dialog */}
+      <Dialog open={addVehicleOpen} onOpenChange={setAddVehicleOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Acquire Lot Vehicle</DialogTitle>
+            <DialogDescription>Register a new vehicle into active dealership fleet inventory.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleAddVehicle} className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">VIN (17 characters)</label>
+                <Input required maxLength={17} placeholder="1HG..." value={newVehicleForm.vin} onChange={(e) => setNewVehicleForm({ ...newVehicleForm, vin: e.target.value })} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">Showroom Branch</label>
+                <Select value={newVehicleForm.showroom_id} onValueChange={(val) => setNewVehicleForm({ ...newVehicleForm, showroom_id: val })}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Select lot showroom..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {showrooms.map((s) => (
+                      <SelectItem key={s.showroom_id} value={s.showroom_id.toString()}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">Make</label>
+                <Input required placeholder="Toyota" value={newVehicleForm.make} onChange={(e) => setNewVehicleForm({ ...newVehicleForm, make: e.target.value })} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">Model</label>
+                <Input required placeholder="Camry" value={newVehicleForm.model} onChange={(e) => setNewVehicleForm({ ...newVehicleForm, model: e.target.value })} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">Year</label>
+                <Input type="number" required placeholder="2022" value={newVehicleForm.year} onChange={(e) => setNewVehicleForm({ ...newVehicleForm, year: e.target.value })} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">Color</label>
+                <Input placeholder="Silver" value={newVehicleForm.color} onChange={(e) => setNewVehicleForm({ ...newVehicleForm, color: e.target.value })} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">Odometer Mileage</label>
+                <Input type="number" placeholder="12000" value={newVehicleForm.mileage} onChange={(e) => setNewVehicleForm({ ...newVehicleForm, mileage: e.target.value })} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">Purchase Cost (₵)</label>
+                <Input type="number" step="0.01" required placeholder="85000" value={newVehicleForm.purchase_price} onChange={(e) => setNewVehicleForm({ ...newVehicleForm, purchase_price: e.target.value })} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">Listing Lot Price (₵)</label>
+                <Input type="number" step="0.01" required placeholder="105000" value={newVehicleForm.listing_price} onChange={(e) => setNewVehicleForm({ ...newVehicleForm, listing_price: e.target.value })} />
+              </div>
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="outline" onClick={() => setAddVehicleOpen(false)}>Cancel</Button>
+              <Button type="submit">Acquire Vehicle</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Showroom Dialog */}
+      <Dialog open={addShowroomOpen} onOpenChange={setAddShowroomOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Register Showroom Branch</DialogTitle>
+            <DialogDescription>Register a new physical showroom branch in the dealership network.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleAddShowroom} className="space-y-4 py-2">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-700">Showroom Name</label>
+              <Input required placeholder="Apex Motors Kumasi" value={newShowroomForm.name} onChange={(e) => setNewShowroomForm({ ...newShowroomForm, name: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-700">Physical Address</label>
+              <Input required placeholder="Kumasi High Street, Ghana" value={newShowroomForm.address} onChange={(e) => setNewShowroomForm({ ...newShowroomForm, address: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">Telephone Number</label>
+                <Input placeholder="+233..." value={newShowroomForm.phone} onChange={(e) => setNewShowroomForm({ ...newShowroomForm, phone: e.target.value })} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">Contact Email</label>
+                <Input type="email" placeholder="kumasi@apexmotors.com" value={newShowroomForm.email} onChange={(e) => setNewShowroomForm({ ...newShowroomForm, email: e.target.value })} />
+              </div>
+            </div>
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="outline" onClick={() => setAddShowroomOpen(false)}>Cancel</Button>
+              <Button type="submit">Register Showroom</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Showroom Dialog */}
+      <Dialog open={editShowroomForm !== null} onOpenChange={(open) => !open && setEditShowroomForm(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Showroom Branch</DialogTitle>
+            <DialogDescription>Modify physical address, phone, or email contact info.</DialogDescription>
+          </DialogHeader>
+          {editShowroomForm && (
+            <form onSubmit={handleUpdateShowroom} className="space-y-4 py-2">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">Showroom Name</label>
+                <Input required value={editShowroomForm.name} onChange={(e) => setEditShowroomForm({ ...editShowroomForm, name: e.target.value })} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">Physical Address</label>
+                <Input required value={editShowroomForm.address} onChange={(e) => setEditShowroomForm({ ...editShowroomForm, address: e.target.value })} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-700">Telephone Number</label>
+                  <Input value={editShowroomForm.phone || ""} onChange={(e) => setEditShowroomForm({ ...editShowroomForm, phone: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-700">Contact Email</label>
+                  <Input type="email" value={editShowroomForm.email || ""} onChange={(e) => setEditShowroomForm({ ...editShowroomForm, email: e.target.value })} />
+                </div>
+              </div>
+              <DialogFooter className="pt-2">
+                <Button type="button" variant="outline" onClick={() => setEditShowroomForm(null)}>Cancel</Button>
+                <Button type="submit">Save Changes</Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Vehicle Dialog */}
+      <Dialog open={editVehicleForm !== null} onOpenChange={(open) => !open && setEditVehicleForm(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Vehicle Details</DialogTitle>
+            <DialogDescription>Modify listing price, color, odometer, or sales availability status.</DialogDescription>
+          </DialogHeader>
+          {editVehicleForm && (
+            <form onSubmit={handleUpdateVehicle} className="space-y-4 py-2">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-700">Vehicle VIN</label>
+                  <Input disabled value={editVehicleForm.vin} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-700">Listing price (₵)</label>
+                  <Input type="number" step="0.01" required value={editVehicleForm.listing_price} onChange={(e) => setEditVehicleForm({ ...editVehicleForm, listing_price: e.target.value })} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-700">Color</label>
+                  <Input required value={editVehicleForm.color} onChange={(e) => setEditVehicleForm({ ...editVehicleForm, color: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-700">Odometer Mileage</label>
+                  <Input type="number" required value={editVehicleForm.mileage} onChange={(e) => setEditVehicleForm({ ...editVehicleForm, mileage: e.target.value })} />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">Inventory Status</label>
+                <Select value={editVehicleForm.status} onValueChange={(val) => setEditVehicleForm({ ...editVehicleForm, status: val })}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Available">Available</SelectItem>
+                    <SelectItem value="Reserved">Reserved</SelectItem>
+                    <SelectItem value="Sold">Sold</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <DialogFooter className="pt-2">
+                <Button type="button" variant="outline" onClick={() => setEditVehicleForm(null)}>Cancel</Button>
+                <Button type="submit">Save Changes</Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
 
-// ----------------------------------------------------
-// 2. Customer Portfolio Workspace
-// ----------------------------------------------------
 export const CustomerWorkspace = () => {
   const [onboardForm, setOnboardForm] = useState({ first_name: "", last_name: "", email: "", phone: "", national_id: "" });
   const [searchQuery, setSearchQuery] = useState("");
@@ -218,8 +657,50 @@ export const CustomerWorkspace = () => {
   
   const [portfolio, setPortfolio] = useState<any>(null);
   const [credit, setCredit] = useState<any>(null);
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [showrooms, setShowrooms] = useState<any[]>([]);
+  const [hireForm, setHireForm] = useState({ first_name: "", last_name: "", email: "", phone: "", role: "Salesperson", showroom_id: "", commission_rate: "0.05" });
+  const [hireDialogOpen, setHireDialogOpen] = useState(false);
+
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+
+  const [editEmployeeForm, setEditEmployeeForm] = useState<any>(null);
+
+  const handleUpdateEmployee = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editEmployeeForm) return;
+    try {
+      const res = await api.updateEmployee({
+        employee_id: editEmployeeForm.employee_id,
+        first_name: editEmployeeForm.first_name,
+        last_name: editEmployeeForm.last_name,
+        email: editEmployeeForm.email,
+        phone: editEmployeeForm.phone || undefined,
+        role: editEmployeeForm.role,
+        commission_rate: parseFloat(editEmployeeForm.commission_rate),
+        is_active: !!editEmployeeForm.is_active,
+        showroom_id: parseInt(editEmployeeForm.showroom_id),
+      });
+      setMessage(res.message);
+      setError("");
+      setEditEmployeeForm(null);
+      fetchEmployees();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  const handleDeleteEmployee = async (id: number) => {
+    try {
+      const res = await api.deleteEmployee(id);
+      setMessage(res.message);
+      setError("");
+      fetchEmployees();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
 
   const fetchCustomers = async (query: string) => {
     try {
@@ -230,8 +711,20 @@ export const CustomerWorkspace = () => {
     }
   };
 
+  const fetchEmployees = async () => {
+    try {
+      const res = await api.getEmployees();
+      setEmployees(res.employees || []);
+      const sRes = await api.getShowrooms();
+      setShowrooms(sRes.showrooms || []);
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
   useEffect(() => {
     fetchCustomers("");
+    fetchEmployees();
   }, []);
 
   const handleOnboard = async (e: React.FormEvent) => {
@@ -248,6 +741,29 @@ export const CustomerWorkspace = () => {
       setOnboardForm({ first_name: "", last_name: "", email: "", phone: "", national_id: "" });
       setError("");
       fetchCustomers(searchQuery);
+    } catch (err: any) {
+      setError(err.message);
+      setMessage("");
+    }
+  };
+
+  const handleHireEmployee = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await api.addEmployee({
+        showroom_id: parseInt(hireForm.showroom_id),
+        first_name: hireForm.first_name,
+        last_name: hireForm.last_name,
+        email: hireForm.email,
+        phone: hireForm.phone || undefined,
+        role: hireForm.role,
+        commission_rate: parseFloat(hireForm.commission_rate),
+      });
+      setMessage(res.message);
+      setError("");
+      setHireForm({ first_name: "", last_name: "", email: "", phone: "", role: "Salesperson", showroom_id: "", commission_rate: "0.05" });
+      setHireDialogOpen(false);
+      fetchEmployees();
     } catch (err: any) {
       setError(err.message);
       setMessage("");
@@ -292,256 +808,526 @@ export const CustomerWorkspace = () => {
     }
   };
 
+  const [editCustomerForm, setEditCustomerForm] = useState<any>(null);
+
+  const handleUpdateCustomer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editCustomerForm) return;
+    try {
+      const res = await api.updateCustomer({
+        customer_id: editCustomerForm.customer_id,
+        first_name: editCustomerForm.first_name,
+        last_name: editCustomerForm.last_name,
+        email: editCustomerForm.email,
+        phone: editCustomerForm.phone,
+        national_id: editCustomerForm.national_id,
+        credit_status: editCustomerForm.credit_status,
+      });
+      setMessage(res.message);
+      setError("");
+      setEditCustomerForm(null);
+      
+      const updatedCust = { ...selectedCustomer, ...editCustomerForm };
+      setSelectedCustomer(updatedCust);
+      fetchCustomers(searchQuery);
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Onboard Customer Form */}
-      <div className="lg:col-span-1">
-        <Card>
-          <CardHeader>
-            <CardTitle>Onboard Customer</CardTitle>
-            <CardDescription>Register a new client profile.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleOnboard} className="space-y-4">
+    <div className="space-y-6">
+      {message && <div className="p-4 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-sm">{message}</div>}
+      {error && <div className="p-4 bg-rose-50 text-rose-800 border border-rose-200 rounded-lg text-sm">{error}</div>}
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Onboard Customer Form */}
+        <div className="lg:col-span-1">
+          <Card>
+            <CardHeader>
+              <CardTitle>Onboard Customer</CardTitle>
+              <CardDescription>Register a new client profile.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleOnboard} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-slate-700">First Name</label>
+                    <Input required value={onboardForm.first_name} onChange={(e) => setOnboardForm({ ...onboardForm, first_name: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-slate-700">Last Name</label>
+                    <Input required value={onboardForm.last_name} onChange={(e) => setOnboardForm({ ...onboardForm, last_name: e.target.value })} />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-700">Email Address</label>
+                  <Input type="email" required value={onboardForm.email} onChange={(e) => setOnboardForm({ ...onboardForm, email: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-700">Phone number</label>
+                  <Input required value={onboardForm.phone} onChange={(e) => setOnboardForm({ ...onboardForm, phone: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-700">National ID / Document</label>
+                  <Input required value={onboardForm.national_id} onChange={(e) => setOnboardForm({ ...onboardForm, national_id: e.target.value })} />
+                </div>
+                <Button type="submit" className="w-full">Create Account</Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Customer Lookup Profile */}
+        <div className="lg:col-span-2 space-y-6">
+          <Card>
+            <CardHeader className="pb-4">
+              <CardTitle>Customer Portfolio Lookup</CardTitle>
+              <CardDescription>Search customers by name to view ratings and transactions.</CardDescription>
+              <div className="flex gap-2 mt-4">
+                <Input placeholder="Search by customer first or last name..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                <Button onClick={handleSearch}>Search Customer</Button>
+              </div>
+              {searchResults.length > 0 && (
+                <div className="mt-4 border border-slate-200 rounded-lg p-3 space-y-2 bg-white max-h-48 overflow-y-auto">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Search Results ({searchResults.length})</p>
+                  {searchResults.map((cust) => (
+                    <div 
+                      key={cust.customer_id} 
+                      onClick={() => selectCustomer(cust)}
+                      className={`p-2 border rounded-md cursor-pointer transition-colors text-sm flex justify-between items-center ${
+                        selectedCustomer?.customer_id === cust.customer_id 
+                          ? "bg-slate-100 border-slate-400 font-medium" 
+                          : "hover:bg-slate-50 border-slate-200"
+                      }`}
+                    >
+                      <div>
+                        <p className="text-slate-800 font-medium">{cust.first_name} {cust.last_name}</p>
+                        <p className="text-xs text-slate-400">{cust.email} | {cust.phone}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge className="bg-slate-200 text-slate-700 font-normal">ID: {cust.customer_id}</Badge>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="h-8 px-2 text-xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteCustomer(cust.customer_id);
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardHeader>
+          </Card>
+
+          {selectedCustomer && (
+            <Card className="bg-slate-50/50 border border-slate-200 shadow-none">
+              <CardHeader className="pb-2 border-b border-slate-200/80 bg-white rounded-t-xl">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <CardTitle className="text-xl font-bold text-slate-800">{selectedCustomer.first_name} {selectedCustomer.last_name}</CardTitle>
+                      <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => setEditCustomerForm(selectedCustomer)}>
+                        Edit Details
+                      </Button>
+                    </div>
+                    <CardDescription className="text-xs text-slate-400 mt-0.5">National ID: {selectedCustomer.national_id}</CardDescription>
+                  </div>
+                  <div className="text-right">
+                    <Badge className="bg-slate-200 text-slate-700 border-slate-300 border uppercase text-[9px] tracking-wider">
+                      Credit Limit Status: {selectedCustomer.credit_status}
+                    </Badge>
+                    {credit && (
+                      <p className="text-xs font-semibold text-slate-700 mt-1">
+                        Active Debt Capacity: <span className="text-rose-600 font-bold">{formatCurr(credit.active_debt_balance)}</span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </CardHeader>
+
+              <Tabs defaultValue="purchases" className="w-full">
+                <TabsList className="w-full flex border-b border-slate-200 bg-white rounded-none p-0 h-10">
+                  <TabsTrigger value="purchases" className="flex-1 text-xs font-semibold py-2.5 border-b-2 border-transparent data-[state=active]:border-slate-800 rounded-none bg-transparent">Vehicle Purchases</TabsTrigger>
+                  <TabsTrigger value="services" className="flex-1 text-xs font-semibold py-2.5 border-b-2 border-transparent data-[state=active]:border-slate-800 rounded-none bg-transparent">Service Repairs</TabsTrigger>
+                  <TabsTrigger value="rentals" className="flex-1 text-xs font-semibold py-2.5 border-b-2 border-transparent data-[state=active]:border-slate-800 rounded-none bg-transparent">Rental Agreements</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="purchases" className="p-4 bg-white rounded-b-xl border-t border-slate-100">
+                  {portfolio && (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>VIN</TableHead>
+                          <TableHead>Sale Date</TableHead>
+                          <TableHead>Final Price</TableHead>
+                          <TableHead>Sales Rep</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(portfolio.sales || portfolio.purchases || []).map((p: any) => (
+                          <TableRow key={p.sale_id}>
+                            <TableCell className="font-mono text-xs text-slate-500">{p.vin}</TableCell>
+                            <TableCell>{p.sale_date}</TableCell>
+                            <TableCell className="font-semibold">{formatCurr(p.final_price)}</TableCell>
+                            <TableCell className="text-xs text-slate-500">{p.employee_name || `${p.employee_first || ''} ${p.employee_last || ''}`}</TableCell>
+                          </TableRow>
+                        ))}
+                        {(portfolio.sales || portfolio.purchases || []).length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center py-6 text-slate-400">No purchases found for this client.</TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="services" className="p-4 bg-white rounded-b-xl border-t border-slate-100">
+                  {portfolio && (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Odometer</TableHead>
+                          <TableHead>Job Date</TableHead>
+                          <TableHead>Cost</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(portfolio.servicing || portfolio.services || []).map((s: any) => (
+                          <TableRow key={s.service_job_id}>
+                            <TableCell>{s.odometer_reading.toLocaleString()} miles</TableCell>
+                            <TableCell>{s.service_date}</TableCell>
+                            <TableCell className="font-semibold text-emerald-700">{formatCurr(s.total_cost)}</TableCell>
+                            <TableCell>{getStatusBadge(s.status)}</TableCell>
+                          </TableRow>
+                        ))}
+                        {(portfolio.servicing || portfolio.services || []).length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center py-6 text-slate-400">No repair jobs cataloged.</TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="rentals" className="p-4 bg-white rounded-b-xl border-t border-slate-100">
+                  {portfolio && (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>VIN</TableHead>
+                          <TableHead>Start Date</TableHead>
+                          <TableHead>Daily Rate</TableHead>
+                          <TableHead>Expected End</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(portfolio.rentals || []).map((r: any) => (
+                          <TableRow key={r.rental_id}>
+                            <TableCell className="font-mono text-xs text-slate-500">{r.vin}</TableCell>
+                            <TableCell>{r.start_date}</TableCell>
+                            <TableCell>{formatCurr(r.daily_rate)}</TableCell>
+                            <TableCell>{r.expected_end_date}</TableCell>
+                            <TableCell>{getStatusBadge(r.status)}</TableCell>
+                          </TableRow>
+                        ))}
+                        {(portfolio.rentals || []).length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center py-6 text-slate-400">No active or historic leases found.</TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  )}
+                </TabsContent>
+              </Tabs>
+            </Card>
+          )}
+        </div>
+      </div>
+
+      {/* Employee Directory Section (CRUD Table) */}
+      <Card className="lg:col-span-3 mt-6">
+        <CardHeader className="flex flex-row items-center justify-between pb-4 border-b border-slate-100">
+          <div>
+            <CardTitle className="text-base font-bold text-slate-800">Dealership Employee Directory</CardTitle>
+            <CardDescription className="text-xs text-slate-400">List of all active sales staff, managers, and service technicians.</CardDescription>
+          </div>
+          <Button onClick={() => setHireDialogOpen(true)}>Hire New Employee</Button>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Employee ID</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Showroom Branch</TableHead>
+                <TableHead>Commission Rate</TableHead>
+                <TableHead>Hire Date</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {employees.map((emp: any) => (
+                <TableRow key={emp.employee_id}>
+                  <TableCell className="font-semibold">Staff #{emp.employee_id}</TableCell>
+                  <TableCell className="font-medium text-slate-800">{emp.first_name} {emp.last_name}</TableCell>
+                  <TableCell className="text-xs text-slate-500">{emp.email}</TableCell>
+                  <TableCell>
+                    <Badge className="bg-slate-100 text-slate-800 border-slate-200 border font-normal capitalize">
+                      {emp.role}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-slate-600 text-xs">{emp.showroom_name}</TableCell>
+                  <TableCell className="font-medium">{Math.round(emp.commission_rate * 100)}%</TableCell>
+                  <TableCell className="text-xs text-slate-400">{emp.hire_date}</TableCell>
+                  <TableCell>
+                    {emp.is_active ? (
+                      <Badge className="bg-emerald-50 text-emerald-800 border-emerald-100 border font-normal">Active</Badge>
+                    ) : (
+                      <Badge className="bg-slate-100 text-slate-400 border-slate-200 border font-normal">Inactive</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right space-x-2">
+                    <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setEditEmployeeForm(emp)}>Edit</Button>
+                    <Button size="sm" variant="destructive" className="h-8 text-xs" onClick={() => handleDeleteEmployee(emp.employee_id)}>Delete</Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Hire Employee Dialog */}
+      <Dialog open={hireDialogOpen} onOpenChange={setHireDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Hire New Employee</DialogTitle>
+            <DialogDescription>Register a new staff member and assign them to a showroom lot.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleHireEmployee} className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">First Name</label>
+                <Input required placeholder="John" value={hireForm.first_name} onChange={(e) => setHireForm({ ...hireForm, first_name: e.target.value })} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">Last Name</label>
+                <Input required placeholder="Doe" value={hireForm.last_name} onChange={(e) => setHireForm({ ...hireForm, last_name: e.target.value })} />
+              </div>
+            </div>
+            
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-700">Email Address</label>
+              <Input type="email" required placeholder="john.doe@apexmotors.com" value={hireForm.email} onChange={(e) => setHireForm({ ...hireForm, email: e.target.value })} />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-700">Phone Number</label>
+              <Input placeholder="+233..." value={hireForm.phone} onChange={(e) => setHireForm({ ...hireForm, phone: e.target.value })} />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">Showroom Assignment</label>
+                <Select value={hireForm.showroom_id} onValueChange={(val) => setHireForm({ ...hireForm, showroom_id: val })}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Select showroom..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {showrooms.map((s) => (
+                      <SelectItem key={s.showroom_id} value={s.showroom_id.toString()}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">Role Assignment</label>
+                <Select value={hireForm.role} onValueChange={(val) => setHireForm({ ...hireForm, role: val })}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Select role..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Salesperson">Salesperson</SelectItem>
+                    <SelectItem value="Manager">Showroom Manager</SelectItem>
+                    <SelectItem value="Finance">Finance Manager</SelectItem>
+                    <SelectItem value="Technician">Service Advisor/Technician</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-700">Commission Rate (Decimal, e.g. 0.05 for 5%)</label>
+              <Input type="number" step="0.01" min="0" max="1" placeholder="0.05" value={hireForm.commission_rate} onChange={(e) => setHireForm({ ...hireForm, commission_rate: e.target.value })} />
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="outline" onClick={() => setHireDialogOpen(false)}>Cancel</Button>
+              <Button type="submit">Hire Employee</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Customer Dialog */}
+      <Dialog open={editCustomerForm !== null} onOpenChange={(open) => !open && setEditCustomerForm(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Customer Profile</DialogTitle>
+            <DialogDescription>Modify demographic and credit status details in the database.</DialogDescription>
+          </DialogHeader>
+          {editCustomerForm && (
+            <form onSubmit={handleUpdateCustomer} className="space-y-4 py-2">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-slate-700">First Name</label>
-                  <Input required value={onboardForm.first_name} onChange={(e) => setOnboardForm({ ...onboardForm, first_name: e.target.value })} />
+                  <Input required value={editCustomerForm.first_name} onChange={(e) => setEditCustomerForm({ ...editCustomerForm, first_name: e.target.value })} />
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-slate-700">Last Name</label>
-                  <Input required value={onboardForm.last_name} onChange={(e) => setOnboardForm({ ...onboardForm, last_name: e.target.value })} />
+                  <Input required value={editCustomerForm.last_name} onChange={(e) => setEditCustomerForm({ ...editCustomerForm, last_name: e.target.value })} />
                 </div>
               </div>
+              
               <div className="space-y-1">
                 <label className="text-xs font-medium text-slate-700">Email Address</label>
-                <Input type="email" required value={onboardForm.email} onChange={(e) => setOnboardForm({ ...onboardForm, email: e.target.value })} />
+                <Input type="email" required value={editCustomerForm.email} onChange={(e) => setEditCustomerForm({ ...editCustomerForm, email: e.target.value })} />
               </div>
+
               <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-700">Phone number</label>
-                <Input required value={onboardForm.phone} onChange={(e) => setOnboardForm({ ...onboardForm, phone: e.target.value })} />
+                <label className="text-xs font-medium text-slate-700">Phone Number</label>
+                <Input required value={editCustomerForm.phone} onChange={(e) => setEditCustomerForm({ ...editCustomerForm, phone: e.target.value })} />
               </div>
+
               <div className="space-y-1">
                 <label className="text-xs font-medium text-slate-700">National ID / Document</label>
-                <Input required value={onboardForm.national_id} onChange={(e) => setOnboardForm({ ...onboardForm, national_id: e.target.value })} />
+                <Input required value={editCustomerForm.national_id} onChange={(e) => setEditCustomerForm({ ...editCustomerForm, national_id: e.target.value })} />
               </div>
-              <Button type="submit" className="w-full">Create Account</Button>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">Credit Limit Status</label>
+                <Select value={editCustomerForm.credit_status} onValueChange={(val) => setEditCustomerForm({ ...editCustomerForm, credit_status: val })}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Approved">Approved</SelectItem>
+                    <SelectItem value="Restricted">Restricted</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <DialogFooter className="pt-2">
+                <Button type="button" variant="outline" onClick={() => setEditCustomerForm(null)}>Cancel</Button>
+                <Button type="submit">Save Changes</Button>
+              </DialogFooter>
             </form>
-            {message && <p className="mt-3 text-xs text-emerald-700 font-medium">{message}</p>}
-            {error && <p className="mt-3 text-xs text-rose-700 font-medium">{error}</p>}
-          </CardContent>
-        </Card>
-      </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
-      {/* Customer Lookup Profile */}
-      <div className="lg:col-span-2 space-y-6">
-        <Card>
-          <CardHeader className="pb-4">
-            <CardTitle>Customer Portfolio Lookup</CardTitle>
-            <CardDescription>Search customers by name to view ratings and transactions.</CardDescription>
-            <div className="flex gap-2 mt-4">
-              <Input placeholder="Search by customer first or last name..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-              <Button onClick={handleSearch}>Search Customer</Button>
-            </div>
-            {searchResults.length > 0 && (
-              <div className="mt-4 border border-slate-200 rounded-lg p-3 space-y-2 bg-white max-h-48 overflow-y-auto">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Search Results ({searchResults.length})</p>
-                {searchResults.map((cust) => (
-                  <div 
-                    key={cust.customer_id} 
-                    onClick={() => selectCustomer(cust)}
-                    className={`p-2 border rounded-md cursor-pointer transition-colors text-sm flex justify-between items-center ${
-                      selectedCustomer?.customer_id === cust.customer_id 
-                        ? "bg-slate-100 border-slate-400 font-medium" 
-                        : "hover:bg-slate-50 border-slate-200"
-                    }`}
-                  >
-                    <div>
-                      <p className="text-slate-800 font-medium">{cust.first_name} {cust.last_name}</p>
-                      <p className="text-xs text-slate-400">{cust.email} | {cust.phone}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge className="bg-slate-200 text-slate-700 font-normal">ID: {cust.customer_id}</Badge>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="h-8 px-2 text-xs"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteCustomer(cust.customer_id);
-                        }}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+      {/* Edit Employee Dialog */}
+      <Dialog open={editEmployeeForm !== null} onOpenChange={(open) => !open && setEditEmployeeForm(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Employee Profile</DialogTitle>
+            <DialogDescription>Modify demographic, role, showroom branch, or active status in the database.</DialogDescription>
+          </DialogHeader>
+          {editEmployeeForm && (
+            <form onSubmit={handleUpdateEmployee} className="space-y-4 py-2">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-700">First Name</label>
+                  <Input required value={editEmployeeForm.first_name} onChange={(e) => setEditEmployeeForm({ ...editEmployeeForm, first_name: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-700">Last Name</label>
+                  <Input required value={editEmployeeForm.last_name} onChange={(e) => setEditEmployeeForm({ ...editEmployeeForm, last_name: e.target.value })} />
+                </div>
               </div>
-            )}
-          </CardHeader>
-        </Card>
+              
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">Email Address</label>
+                <Input type="email" required value={editEmployeeForm.email} onChange={(e) => setEditEmployeeForm({ ...editEmployeeForm, email: e.target.value })} />
+              </div>
 
-        {selectedCustomer && (
-          <Card className="bg-slate-50/50 border border-slate-200 shadow-none">
-            <CardHeader className="py-4 border-b border-slate-200">
-              <CardTitle className="text-sm font-bold text-slate-800">Customer Biodata File</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-4 grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-              <div>
-                <span className="text-xs text-slate-400 font-medium block">Full Name</span>
-                <span className="font-semibold text-slate-800">{selectedCustomer.first_name} {selectedCustomer.last_name}</span>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">Phone Number</label>
+                <Input value={editEmployeeForm.phone || ""} onChange={(e) => setEditEmployeeForm({ ...editEmployeeForm, phone: e.target.value })} />
               </div>
-              <div>
-                <span className="text-xs text-slate-400 font-medium block">National ID Document</span>
-                <span className="font-semibold text-slate-800">{selectedCustomer.national_id}</span>
-              </div>
-              <div>
-                <span className="text-xs text-slate-400 font-medium block">Phone number</span>
-                <span className="font-semibold text-slate-800">{selectedCustomer.phone}</span>
-              </div>
-              <div>
-                <span className="text-xs text-slate-400 font-medium block">Email Address</span>
-                <span className="font-semibold text-slate-800">{selectedCustomer.email}</span>
-              </div>
-              <div>
-                <span className="text-xs text-slate-400 font-medium block">Credit Status</span>
-                <Badge className={selectedCustomer.credit_status === "Approved" ? "bg-emerald-100 text-emerald-800 border-emerald-200" : "bg-rose-100 text-rose-800 border-rose-200"}>
-                  {selectedCustomer.credit_status}
-                </Badge>
-              </div>
-              <div>
-                <span className="text-xs text-slate-400 font-medium block">Customer ID</span>
-                <span className="font-mono text-slate-600">#{selectedCustomer.customer_id}</span>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
-        {credit && (
-          <Card>
-            <CardHeader className="py-4 border-b border-slate-100 flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-base">Credit Eligibility Check</CardTitle>
-                <CardDescription>Active Debt: {formatCurr(credit.active_debt)}</CardDescription>
-              </div>
-              <div>
-                {credit.eligible_for_financing ? (
-                  <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 border">Eligible for Financing</Badge>
-                ) : (
-                  <Badge className="bg-rose-100 text-rose-800 border-rose-200 border">Restricted / Outstanding Debts</Badge>
-                )}
-              </div>
-            </CardHeader>
-          </Card>
-        )}
-
-        {portfolio && (
-          <Tabs defaultValue="sales">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="sales">Purchases</TabsTrigger>
-              <TabsTrigger value="service">Servicing</TabsTrigger>
-              <TabsTrigger value="rentals">Rentals</TabsTrigger>
-            </TabsList>
-            <TabsContent value="sales">
-              <Card>
-                <CardContent className="p-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Sale ID</TableHead>
-                        <TableHead>VIN</TableHead>
-                        <TableHead>Final Price</TableHead>
-                        <TableHead>Date</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {portfolio.sales.map((s: any) => (
-                        <TableRow key={s.sale_id}>
-                          <TableCell>{s.sale_id}</TableCell>
-                          <TableCell className="font-mono text-xs">{s.vin_id}</TableCell>
-                          <TableCell className="font-medium">{formatCurr(s.final_price)}</TableCell>
-                          <TableCell>{s.sale_date}</TableCell>
-                        </TableRow>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-700">Showroom Assignment</label>
+                  <Select value={editEmployeeForm.showroom_id?.toString()} onValueChange={(val) => setEditEmployeeForm({ ...editEmployeeForm, showroom_id: val })}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {showrooms.map((s) => (
+                        <SelectItem key={s.showroom_id} value={s.showroom_id.toString()}>{s.name}</SelectItem>
                       ))}
-                      {portfolio.sales.length === 0 && (
-                        <TableRow>
-                          <TableCell colSpan={4} className="text-center py-6 text-slate-400">No lifetime purchases found.</TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            <TabsContent value="service">
-              <Card>
-                <CardContent className="p-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Job ID</TableHead>
-                        <TableHead>VIN</TableHead>
-                        <TableHead>Odometer</TableHead>
-                        <TableHead>Total Cost</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {portfolio.servicing.map((s: any) => (
-                        <TableRow key={s.service_job_id}>
-                          <TableCell>{s.service_job_id}</TableCell>
-                          <TableCell className="font-mono text-xs">{s.vin_id}</TableCell>
-                          <TableCell>{s.odometer_reading} miles</TableCell>
-                          <TableCell className="font-medium">{formatCurr(s.total_cost)}</TableCell>
-                          <TableCell>{getStatusBadge(s.status)}</TableCell>
-                        </TableRow>
-                      ))}
-                      {portfolio.servicing.length === 0 && (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center py-6 text-slate-400">No servicing records found.</TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            <TabsContent value="rentals">
-              <Card>
-                <CardContent className="p-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Rental ID</TableHead>
-                        <TableHead>VIN</TableHead>
-                        <TableHead>Daily Rate</TableHead>
-                        <TableHead>Expected End</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {portfolio.rentals.map((r: any) => (
-                        <TableRow key={r.rental_id}>
-                          <TableCell>{r.rental_id}</TableCell>
-                          <TableCell className="font-mono text-xs">{r.vin_id}</TableCell>
-                          <TableCell>{formatCurr(r.daily_rate)}/day</TableCell>
-                          <TableCell>{r.expected_end_date}</TableCell>
-                          <TableCell>{getStatusBadge(r.status)}</TableCell>
-                        </TableRow>
-                      ))}
-                      {portfolio.rentals.length === 0 && (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center py-6 text-slate-400">No active or historic leases found.</TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        )}
-      </div>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-700">Role Assignment</label>
+                  <Select value={editEmployeeForm.role} onValueChange={(val) => setEditEmployeeForm({ ...editEmployeeForm, role: val })}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Salesperson">Salesperson</SelectItem>
+                      <SelectItem value="Manager">Showroom Manager</SelectItem>
+                      <SelectItem value="Finance">Finance Manager</SelectItem>
+                      <SelectItem value="Technician">Service Advisor/Technician</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-700">Commission Rate</label>
+                  <Input type="number" step="0.01" value={editEmployeeForm.commission_rate} onChange={(e) => setEditEmployeeForm({ ...editEmployeeForm, commission_rate: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-700">Status</label>
+                  <Select value={editEmployeeForm.is_active ? "1" : "0"} onValueChange={(val) => setEditEmployeeForm({ ...editEmployeeForm, is_active: val === "1" })}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">Active</SelectItem>
+                      <SelectItem value="0">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <DialogFooter className="pt-2">
+                <Button type="button" variant="outline" onClick={() => setEditEmployeeForm(null)}>Cancel</Button>
+                <Button type="submit">Save Changes</Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
@@ -567,8 +1353,22 @@ export const CheckoutWorkspace = () => {
     traded_in_color: "",
     traded_in_mileage: "",
   });
+  const [sales, setSales] = useState<any[]>([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  const fetchSales = async () => {
+    try {
+      const res = await api.getSalesRegistry();
+      setSales(res.sales || []);
+    } catch (e: any) {
+      setError(e.message);
+    }
+  };
+
+  useEffect(() => {
+    fetchSales();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -600,6 +1400,25 @@ export const CheckoutWorkspace = () => {
       const res = await api.checkout(payload);
       setMessage(res.message);
       setError("");
+      // Reset form
+      setForm({
+        vin: "",
+        customer_id: "",
+        sale_date: new Date().toISOString().split("T")[0],
+        final_price: "",
+        is_financed: false,
+        down_payment: "",
+        interest_rate: "",
+        term_months: "",
+        trade_in_allowance: "",
+        traded_in_vin: "",
+        traded_in_make: "",
+        traded_in_model: "",
+        traded_in_year: "",
+        traded_in_color: "",
+        traded_in_mileage: "",
+      });
+      fetchSales();
     } catch (e: any) {
       setError(e.message);
       setMessage("");
@@ -607,96 +1426,155 @@ export const CheckoutWorkspace = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <Card>
-        <CardHeader>
-          <CardTitle>POS Sale Checkout desk</CardTitle>
-          <CardDescription>Execute vehicle checkout sales and record trade-in acquisitions.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-700">Vehicle VIN</label>
-                <Input required value={form.vin} onChange={(e) => setForm({ ...form, vin: e.target.value })} />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-700">Customer ID</label>
-                <Input type="number" required value={form.customer_id} onChange={(e) => setForm({ ...form, customer_id: e.target.value })} />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-700">Final Price</label>
-                <Input type="number" required value={form.final_price} onChange={(e) => setForm({ ...form, final_price: e.target.value })} />
-              </div>
-            </div>
+    <div className="space-y-6">
+      {message && <div className="p-4 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-sm">{message}</div>}
+      {error && <div className="p-4 bg-rose-50 text-rose-800 border border-rose-200 rounded-lg text-sm">{error}</div>}
 
-            {/* Financing Block */}
-            <div className="p-4 bg-slate-50 border border-slate-100 rounded-lg space-y-4">
-              <div className="flex items-center gap-2">
-                <input type="checkbox" id="is_financed" checked={form.is_financed} onChange={(e) => setForm({ ...form, is_financed: e.target.checked })} />
-                <label htmlFor="is_financed" className="text-sm font-medium text-slate-700">Apply Dealer In-House Financing</label>
-              </div>
-              {form.is_financed && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-slate-700">Down Payment</label>
-                    <Input type="number" placeholder="Min 40% value" value={form.down_payment} onChange={(e) => setForm({ ...form, down_payment: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-slate-700">Interest Rate (%)</label>
-                    <Input type="number" placeholder="5.5" value={form.interest_rate} onChange={(e) => setForm({ ...form, interest_rate: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-slate-700">Term Schedule (Months)</label>
-                    <Input type="number" placeholder="Max 12 months" value={form.term_months} onChange={(e) => setForm({ ...form, term_months: e.target.value })} />
-                  </div>
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* Checkout Form */}
+        <div className="xl:col-span-1">
+          <Card>
+            <CardHeader>
+              <CardTitle>POS Sales Checkout</CardTitle>
+              <CardDescription>Finalize vehicle purchase contracts and trade-ins.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-700">Vehicle VIN</label>
+                  <Input required placeholder="Enter vehicle VIN..." value={form.vin} onChange={(e) => setForm({ ...form, vin: e.target.value })} />
                 </div>
-              )}
-            </div>
-
-            {/* Trade-In Block */}
-            <div className="p-4 bg-slate-50 border border-slate-100 rounded-lg space-y-4">
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-slate-700">Trade-In Allowance (Optional)</label>
-                <Input type="number" value={form.trade_in_allowance} onChange={(e) => setForm({ ...form, trade_in_allowance: e.target.value })} />
-              </div>
-              {form.trade_in_allowance && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-slate-700">Trade-In VIN</label>
-                    <Input value={form.traded_in_vin} onChange={(e) => setForm({ ...form, traded_in_vin: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-slate-700">Make</label>
-                    <Input value={form.traded_in_make} onChange={(e) => setForm({ ...form, traded_in_make: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-slate-700">Model</label>
-                    <Input value={form.traded_in_model} onChange={(e) => setForm({ ...form, traded_in_model: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-slate-700">Year</label>
-                    <Input type="number" value={form.traded_in_year} onChange={(e) => setForm({ ...form, traded_in_year: e.target.value })} />
-                  </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-700">Customer ID</label>
+                  <Input type="number" required placeholder="Enter Customer ID..." value={form.customer_id} onChange={(e) => setForm({ ...form, customer_id: e.target.value })} />
                 </div>
-              )}
-            </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-700">Final Price (₵)</label>
+                  <Input type="number" step="0.01" required placeholder="Final selling price..." value={form.final_price} onChange={(e) => setForm({ ...form, final_price: e.target.value })} />
+                </div>
 
-            <Button type="submit" className="w-full">Process Checkout Transaction</Button>
-          </form>
-          {message && <p className="mt-4 p-3 bg-emerald-50 text-emerald-800 border border-emerald-100 rounded-lg text-sm">{message}</p>}
-          {error && <p className="mt-4 p-3 bg-rose-50 text-rose-800 border border-rose-100 rounded-lg text-sm">{error}</p>}
-        </CardContent>
-      </Card>
+                <div className="flex items-center space-x-2 py-2">
+                  <input type="checkbox" id="is_financed" checked={form.is_financed} onChange={(e) => setForm({ ...form, is_financed: e.target.checked })} className="rounded border-slate-300 text-slate-900 focus:ring-slate-900" />
+                  <label htmlFor="is_financed" className="text-xs font-medium text-slate-700">Apply BHPH financing</label>
+                </div>
+
+                {form.is_financed && (
+                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-lg space-y-3">
+                    <p className="text-xs font-bold text-slate-600 uppercase tracking-wider">Financing Terms</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="space-y-1">
+                        <label className="text-xs text-slate-500">Down Payment</label>
+                        <Input type="number" required value={form.down_payment} onChange={(e) => setForm({ ...form, down_payment: e.target.value })} />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-slate-500">Interest %</label>
+                        <Input type="number" step="0.1" required value={form.interest_rate} onChange={(e) => setForm({ ...form, interest_rate: e.target.value })} />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-slate-500">Months</label>
+                        <Input type="number" required value={form.term_months} onChange={(e) => setForm({ ...form, term_months: e.target.value })} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-700">Trade-in Allowance (₵) (Optional)</label>
+                  <Input type="number" step="0.01" placeholder="Leave empty if no trade-in" value={form.trade_in_allowance} onChange={(e) => setForm({ ...form, trade_in_allowance: e.target.value })} />
+                </div>
+
+                {parseFloat(form.trade_in_allowance) > 0 && (
+                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-lg space-y-3">
+                    <p className="text-xs font-bold text-slate-600 uppercase tracking-wider">Traded-in Vehicle Info</p>
+                    <div className="space-y-2">
+                      <div className="space-y-1">
+                        <label className="text-xs text-slate-500">VIN</label>
+                        <Input required value={form.traded_in_vin} onChange={(e) => setForm({ ...form, traded_in_vin: e.target.value })} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <label className="text-xs text-slate-500">Make</label>
+                          <Input required value={form.traded_in_make} onChange={(e) => setForm({ ...form, traded_in_make: e.target.value })} />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs text-slate-500">Model</label>
+                          <Input required value={form.traded_in_model} onChange={(e) => setForm({ ...form, traded_in_model: e.target.value })} />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-1">
+                          <label className="text-xs text-slate-500">Year</label>
+                          <Input type="number" required value={form.traded_in_year} onChange={(e) => setForm({ ...form, traded_in_year: e.target.value })} />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs text-slate-500">Color</label>
+                          <Input required value={form.traded_in_color} onChange={(e) => setForm({ ...form, traded_in_color: e.target.value })} />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs text-slate-500">Mileage</label>
+                          <Input type="number" required value={form.traded_in_mileage} onChange={(e) => setForm({ ...form, traded_in_mileage: e.target.value })} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <Button type="submit" className="w-full">Process Checkout Transaction</Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Sales Ledger */}
+        <div className="xl:col-span-2">
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle className="text-base font-bold text-slate-800">Dealership Sales Ledger</CardTitle>
+              <CardDescription className="text-xs text-slate-400">Registry of all past car checkouts and calculated staff commissions.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0 border-t border-slate-100">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Sale ID</TableHead>
+                    <TableHead>VIN</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Salesperson</TableHead>
+                    <TableHead>Sale Price</TableHead>
+                    <TableHead>Commission</TableHead>
+                    <TableHead>Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sales.map((s: any) => (
+                    <TableRow key={s.sale_id}>
+                      <TableCell className="font-semibold">Sale #{s.sale_id}</TableCell>
+                      <TableCell className="font-mono text-xs text-slate-600">{s.vin}</TableCell>
+                      <TableCell className="text-xs font-medium text-slate-800">{s.customer_first} {s.customer_last}</TableCell>
+                      <TableCell className="text-xs text-slate-600">{s.employee_first} {s.employee_last}</TableCell>
+                      <TableCell className="font-semibold text-slate-800">{formatCurr(s.final_price)}</TableCell>
+                      <TableCell className="text-emerald-700 font-medium">{formatCurr(s.commission_amount || 0)}</TableCell>
+                      <TableCell className="text-xs text-slate-400">{s.sale_date}</TableCell>
+                    </TableRow>
+                  ))}
+                  {sales.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-6 text-slate-400">No sale transactions logged in the database.</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 };
 
-// ----------------------------------------------------
-// 4. Financing Workspace (BHPH)
-// ----------------------------------------------------
 export const FinancingWorkspace = () => {
   const [loans, setLoans] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
   const [eligibilityCheck, setEligibilityCheck] = useState({ customer_id: "", vehicle_price: "" });
   const [eligibleResult, setEligibleResult] = useState<any>(null);
   
@@ -716,8 +1594,22 @@ export const FinancingWorkspace = () => {
     }
   };
 
-  useEffect(() => {
+  const refreshPayments = async () => {
+    try {
+      const res = await api.getPaymentsRegistry();
+      setPayments(res.payments || []);
+    } catch (e: any) {
+      setError(e.message);
+    }
+  };
+
+  const refreshAll = () => {
     refreshLoans();
+    refreshPayments();
+  };
+
+  useEffect(() => {
+    refreshAll();
   }, []);
 
   const handleEligibility = async () => {
@@ -741,7 +1633,7 @@ export const FinancingWorkspace = () => {
       setMessage(res.message);
       setPayLoanId(null);
       setPayAmount("");
-      refreshLoans();
+      refreshAll();
     } catch (e: any) {
       setError(e.message);
     }
@@ -753,71 +1645,144 @@ export const FinancingWorkspace = () => {
       {message && <div className="p-4 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-sm">{message}</div>}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Loans Table */}
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader><CardTitle>Outstanding Customer Loans</CardTitle></CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Loan ID</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Principal</TableHead>
-                    <TableHead>Balance</TableHead>
-                    <TableHead>Payments</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loans.map((l: any) => (
-                    <TableRow key={l.loan_id}>
-                      <TableCell className="font-medium">LN-{l.loan_id}</TableCell>
-                      <TableCell>{l.customer_name}</TableCell>
-                      <TableCell>{formatCurr(l.principal_amount)}</TableCell>
-                      <TableCell className="font-semibold text-rose-700">{formatCurr(l.principal_balance)}</TableCell>
-                      <TableCell>{l.cleared_payments} cleared</TableCell>
-                      <TableCell>{getStatusBadge(l.status)}</TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="outline" size="sm" onClick={() => setPayLoanId(l.loan_id)}>Log Payment</Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Eligibility Calculator */}
+        {/* Eligibility Check Card */}
         <div className="lg:col-span-1">
           <Card>
             <CardHeader>
-              <CardTitle>Financing Eligibility Check</CardTitle>
-              <CardDescription>Evaluate borrow bounds before closing deals.</CardDescription>
+              <CardTitle>BHPH Financing Calculator</CardTitle>
+              <CardDescription>Verify customer financing terms and credit capacity constraints.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1">
                 <label className="text-xs font-medium text-slate-700">Customer ID</label>
-                <Input type="number" value={eligibilityCheck.customer_id} onChange={(e) => setEligibilityCheck({ ...eligibilityCheck, customer_id: e.target.value })} />
+                <Input type="number" placeholder="Enter Customer ID..." value={eligibilityCheck.customer_id} onChange={(e) => setEligibilityCheck({ ...eligibilityCheck, customer_id: e.target.value })} />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-700">Vehicle Price</label>
-                <Input type="number" value={eligibilityCheck.vehicle_price} onChange={(e) => setEligibilityCheck({ ...eligibilityCheck, vehicle_price: e.target.value })} />
+                <label className="text-xs font-medium text-slate-700">Vehicle Listing Price (₵)</label>
+                <Input type="number" placeholder="Vehicle sticker price..." value={eligibilityCheck.vehicle_price} onChange={(e) => setEligibilityCheck({ ...eligibilityCheck, vehicle_price: e.target.value })} />
               </div>
-              <Button onClick={handleEligibility} className="w-full">Compute Capacity</Button>
+              <Button className="w-full" onClick={handleEligibility}>Check Credit Eligibility</Button>
 
               {eligibleResult && (
-                <div className="mt-4 p-4 bg-slate-50 border border-slate-100 rounded-lg text-center">
-                  <p className="text-xs text-slate-500 font-medium">MAX ELIGIBLE FINANCING</p>
-                  <p className="text-2xl font-bold text-slate-800 mt-1">{formatCurr(eligibleResult.max_eligible_loan)}</p>
+                <div className="mt-4 p-4 border rounded-lg bg-slate-50 space-y-3 text-sm">
+                  <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                    <span className="font-semibold text-slate-700">Eligibility Status</span>
+                    {eligibleResult.eligible_for_financing ? (
+                      <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 border">Eligible</Badge>
+                    ) : (
+                      <Badge className="bg-rose-100 text-rose-800 border-rose-200 border">Restricted</Badge>
+                    )}
+                  </div>
+                  <div className="space-y-1 text-xs text-slate-600">
+                    <p className="flex justify-between"><span>Minimum Down Payment (40%):</span> <span className="font-bold text-slate-800">{formatCurr(eligibleResult.min_down_payment)}</span></p>
+                    <p className="flex justify-between"><span>Standard Interest Rate:</span> <span className="font-bold text-slate-800">{eligibleResult.standard_interest_rate}%</span></p>
+                    <p className="flex justify-between"><span>Maximum Term Duration:</span> <span className="font-bold text-slate-800">{eligibleResult.max_term_months} Months</span></p>
+                    {!eligibleResult.eligible_for_financing && (
+                      <p className="text-rose-600 font-medium mt-2 pt-2 border-t border-slate-200">Reason: Customer has outstanding debt exceeding credit capacity limits.</p>
+                    )}
+                  </div>
                 </div>
               )}
             </CardContent>
           </Card>
         </div>
+
+        {/* Active Financing Accounts Table */}
+        <div className="lg:col-span-2">
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle className="text-base font-bold text-slate-800">Active Financing Portfolios</CardTitle>
+              <CardDescription className="text-xs text-slate-400">List of active vehicle loans, principal payments, and interest terms.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0 border-t border-slate-100">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Loan ID</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Principal Bal</TableHead>
+                    <TableHead>Down Payment</TableHead>
+                    <TableHead>Interest</TableHead>
+                    <TableHead>Term</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loans.map((loan: any) => (
+                    <TableRow key={loan.loan_id}>
+                      <TableCell className="font-semibold">Loan #{loan.loan_id}</TableCell>
+                      <TableCell className="font-medium text-slate-800">{loan.customer_first_name} {loan.customer_last_name}</TableCell>
+                      <TableCell className="font-semibold text-rose-600">{formatCurr(loan.principal_balance)}</TableCell>
+                      <TableCell>{formatCurr(loan.down_payment)}</TableCell>
+                      <TableCell>{loan.interest_rate}%</TableCell>
+                      <TableCell>{loan.term_months}mo</TableCell>
+                      <TableCell>{getStatusBadge(loan.status)}</TableCell>
+                      <TableCell className="text-right">
+                        {loan.status === "Active" ? (
+                          <Button size="sm" variant="outline" className="h-8" onClick={() => setPayLoanId(loan.loan_id)}>Log Payment</Button>
+                        ) : (
+                          <span className="text-xs text-slate-400 font-medium px-4">—</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {loans.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-6 text-slate-400">No active financing contracts logged.</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
       </div>
+
+      {/* Installment Payment Ledger */}
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="text-base font-bold text-slate-800">Installment Payment Ledger</CardTitle>
+          <CardDescription className="text-xs text-slate-400">Ledger registry of financing installment receipts from customers.</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0 border-t border-slate-100">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Payment ID</TableHead>
+                <TableHead>Loan ID</TableHead>
+                <TableHead>Customer</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Method</TableHead>
+                <TableHead>Date Logged</TableHead>
+                <TableHead>Receipt Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {payments.map((p: any) => (
+                <TableRow key={p.payment_id}>
+                  <TableCell className="font-semibold">Receipt #{p.payment_id}</TableCell>
+                  <TableCell className="font-semibold">Loan #{p.loan_id}</TableCell>
+                  <TableCell className="font-medium text-slate-800">{p.customer_first} {p.customer_last}</TableCell>
+                  <TableCell className="font-semibold text-emerald-800">{formatCurr(p.amount)}</TableCell>
+                  <TableCell className="capitalize text-slate-600 text-xs">{p.payment_method.replace("_", " ")}</TableCell>
+                  <TableCell className="text-xs text-slate-400">{p.payment_date}</TableCell>
+                  <TableCell>
+                    <Badge className="bg-emerald-50 text-emerald-800 border-emerald-100 border font-normal">
+                      {p.receipt_status}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {payments.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-6 text-slate-400">No payment receipts logged in the database.</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       {/* Payment Dialog */}
       <Dialog open={payLoanId !== null} onOpenChange={(open) => !open && setPayLoanId(null)}>
@@ -852,18 +1817,84 @@ export const FinancingWorkspace = () => {
     </div>
   );
 };
+const ServiceJobsList = ({ onRefreshNeeded }: { onRefreshNeeded?: () => void }) => {
+  const [jobs, setJobs] = useState<any[]>([]);
 
-// ----------------------------------------------------
-// 5. Service Bay Workspace
-// ----------------------------------------------------
+  const fetchJobs = async () => {
+    try {
+      const res = await api.getJobs();
+      setJobs(res.jobs || []);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    fetchJobs();
+  }, [onRefreshNeeded]);
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Job ID</TableHead>
+          <TableHead>VIN</TableHead>
+          <TableHead>Customer</TableHead>
+          <TableHead>Technician</TableHead>
+          <TableHead>Showroom</TableHead>
+          <TableHead>Odometer</TableHead>
+          <TableHead>Total Cost</TableHead>
+          <TableHead>Status</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {jobs.map((j: any) => (
+          <TableRow key={j.service_job_id}>
+            <TableCell className="font-semibold">Job #{j.service_job_id}</TableCell>
+            <TableCell className="font-mono text-xs text-slate-600">{j.vin}</TableCell>
+            <TableCell className="text-xs font-medium text-slate-800">{j.customer_first} {j.customer_last}</TableCell>
+            <TableCell className="text-xs text-slate-600">{j.employee_first} {j.employee_last}</TableCell>
+            <TableCell className="text-xs text-slate-500">{j.showroom_name}</TableCell>
+            <TableCell className="text-xs">{j.odometer_reading.toLocaleString()} mi</TableCell>
+            <TableCell className="font-semibold text-slate-800">{formatCurr(j.total_cost || 0)}</TableCell>
+            <TableCell>{getStatusBadge(j.status)}</TableCell>
+          </TableRow>
+        ))}
+        {jobs.length === 0 && (
+          <TableRow>
+            <TableCell colSpan={8} className="text-center py-6 text-slate-400">No active service orders in queue.</TableCell>
+          </TableRow>
+        )}
+      </TableBody>
+    </Table>
+  );
+};
+
 export const ServiceWorkspace = () => {
   const [jobForm, setJobForm] = useState({ vin: "", customer_id: "", odometer_reading: "" });
   const [itemForm, setItemForm] = useState({ service_job_id: "", description: "", labor_cost: "", parts_cost: "", payor_type: "Customer_Out_Of_Pocket" });
   const [warrantyVin, setWarrantyVin] = useState("");
   const [warrantyMileage, setWarrantyMileage] = useState("");
   const [warranties, setWarranties] = useState<any[]>([]);
+  const [allWarranties, setAllWarranties] = useState<any[]>([]);
+  const [allClaims, setAllClaims] = useState<any[]>([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  const fetchWarrantiesAndClaims = async () => {
+    try {
+      const wRes = await api.getWarranties();
+      setAllWarranties(wRes.warranties || []);
+      const cRes = await api.getWarrantyClaims();
+      setAllClaims(cRes.warranty_claims || []);
+    } catch (e: any) {
+      setError(e.message);
+    }
+  };
+
+  useEffect(() => {
+    fetchWarrantiesAndClaims();
+  }, []);
 
   const handleCreateJob = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -875,6 +1906,7 @@ export const ServiceWorkspace = () => {
       });
       setMessage(res.message);
       setJobForm({ vin: "", customer_id: "", odometer_reading: "" });
+      fetchWarrantiesAndClaims();
     } catch (e: any) {
       setError(e.message);
     }
@@ -892,6 +1924,7 @@ export const ServiceWorkspace = () => {
       });
       setMessage(res.message);
       setItemForm({ service_job_id: "", description: "", labor_cost: "", parts_cost: "", payor_type: "Customer_Out_Of_Pocket" });
+      fetchWarrantiesAndClaims();
     } catch (e: any) {
       setError(e.message);
     }
@@ -909,7 +1942,6 @@ export const ServiceWorkspace = () => {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Forms column */}
       <div className="lg:col-span-1 space-y-6">
         <Card>
           <CardHeader><CardTitle>Create Work Order</CardTitle></CardHeader>
@@ -927,13 +1959,13 @@ export const ServiceWorkspace = () => {
                 <label className="text-xs font-medium text-slate-700">Odometer Reading</label>
                 <Input type="number" required value={jobForm.odometer_reading} onChange={(e) => setJobForm({ ...jobForm, odometer_reading: e.target.value })} />
               </div>
-              <Button type="submit" className="w-full">Intake Vehicle</Button>
+              <Button type="submit" className="w-full">Open Service Ticket</Button>
             </form>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader><CardTitle>Append Task / Item</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Add Service Line Item</CardTitle></CardHeader>
           <CardContent>
             <form onSubmit={handleAddItem} className="space-y-4">
               <div className="space-y-1">
@@ -947,11 +1979,11 @@ export const ServiceWorkspace = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-slate-700">Labor Cost (₵)</label>
-                  <Input type="number" required value={itemForm.labor_cost} onChange={(e) => setItemForm({ ...itemForm, labor_cost: e.target.value })} />
+                  <Input type="number" step="0.01" required value={itemForm.labor_cost} onChange={(e) => setItemForm({ ...itemForm, labor_cost: e.target.value })} />
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-slate-700">Parts Cost (₵)</label>
-                  <Input type="number" required value={itemForm.parts_cost} onChange={(e) => setItemForm({ ...itemForm, parts_cost: e.target.value })} />
+                  <Input type="number" step="0.01" required value={itemForm.parts_cost} onChange={(e) => setItemForm({ ...itemForm, parts_cost: e.target.value })} />
                 </div>
               </div>
               <div className="space-y-1">
@@ -964,41 +1996,44 @@ export const ServiceWorkspace = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <Button type="submit" className="w-full">Append Task</Button>
+              <Button type="submit" className="w-full">Log Labor/Parts Charge</Button>
             </form>
           </CardContent>
         </Card>
       </div>
 
-      {/* Lookup column */}
       <div className="lg:col-span-2 space-y-6">
         {message && <div className="p-4 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-sm">{message}</div>}
         {error && <div className="p-4 bg-rose-50 text-rose-800 border border-rose-200 rounded-lg text-sm">{error}</div>}
 
         <Card>
           <CardHeader>
-            <CardTitle>Active Warranty lookup</CardTitle>
-            <CardDescription>Check live coverage coverage terms by VIN and odometer mileage.</CardDescription>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-500">VIN</label>
-                <Input value={warrantyVin} onChange={(e) => setWarrantyVin(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-500">Odometer Reading</label>
-                <Input type="number" value={warrantyMileage} onChange={(e) => setWarrantyMileage(e.target.value)} />
-              </div>
-            </div>
-            <Button onClick={handleWarrantyLookup} className="mt-4">Lookup Coverage</Button>
+            <CardTitle>Active Service Bay Queue</CardTitle>
+            <CardDescription>Vehicles currently undergoing repairs or regular checks.</CardDescription>
           </CardHeader>
-          <CardContent className="p-0 border-t border-slate-100">
+          <CardContent className="p-0">
+            <ServiceJobsList onRefreshNeeded={fetchWarrantiesAndClaims} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Warranty Contract Lookup</CardTitle>
+            <CardDescription>Verify active manufacturer warranties by vehicle odometer status.</CardDescription>
+            <div className="grid grid-cols-3 gap-2 mt-4">
+              <Input placeholder="Vehicle VIN" value={warrantyVin} onChange={(e) => setWarrantyVin(e.target.value)} />
+              <Input type="number" placeholder="Current Odometer" value={warrantyMileage} onChange={(e) => setWarrantyMileage(e.target.value)} />
+              <Button onClick={handleWarrantyLookup}>Query Coverage</Button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Provider</TableHead>
-                  <TableHead>Coverage Type</TableHead>
+                  <TableHead>Coverage</TableHead>
                   <TableHead>Mileage Limit</TableHead>
-                  <TableHead>Expiry Date</TableHead>
+                  <TableHead>Expiration Date</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1006,13 +2041,91 @@ export const ServiceWorkspace = () => {
                   <TableRow key={w.warranty_id}>
                     <TableCell className="font-medium">{w.provider}</TableCell>
                     <TableCell>{w.coverage_type}</TableCell>
-                    <TableCell>{w.mileage_limit.toLocaleString()} miles</TableCell>
+                    <TableCell>{w.mileage_limit.toLocaleString()} mi</TableCell>
                     <TableCell>{w.end_date}</TableCell>
                   </TableRow>
                 ))}
                 {warranties.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center py-6 text-slate-400">No active warranty contracts found.</TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 col-span-1 lg:col-span-3">
+        <Card className="shadow-sm border-slate-200">
+          <CardHeader>
+            <CardTitle className="text-base font-bold text-slate-800">Dealership Warranties Ledger</CardTitle>
+            <CardDescription className="text-xs text-slate-400">All registered warranty coverages across the fleet.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0 border-t border-slate-100">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Warranty ID</TableHead>
+                  <TableHead>VIN</TableHead>
+                  <TableHead>Provider</TableHead>
+                  <TableHead>Coverage</TableHead>
+                  <TableHead>Mileage Limit</TableHead>
+                  <TableHead>Expires</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {allWarranties.map((w: any) => (
+                  <TableRow key={w.warranty_id}>
+                    <TableCell className="font-semibold">Contract #{w.warranty_id}</TableCell>
+                    <TableCell className="font-mono text-xs text-slate-600">{w.vin}</TableCell>
+                    <TableCell className="font-medium text-slate-800">{w.provider}</TableCell>
+                    <TableCell className="text-xs">{w.coverage_type}</TableCell>
+                    <TableCell className="text-xs">{w.mileage_limit.toLocaleString()} mi</TableCell>
+                    <TableCell className="text-xs text-slate-400">{w.end_date}</TableCell>
+                  </TableRow>
+                ))}
+                {allWarranties.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-6 text-slate-400">No warranties registered in the database.</TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm border-slate-200">
+          <CardHeader>
+            <CardTitle className="text-base font-bold text-slate-800">Warranty Claims Register</CardTitle>
+            <CardDescription className="text-xs text-slate-400">All submitted line item claims under active manufacturer warranties.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0 border-t border-slate-100">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Claim ID</TableHead>
+                  <TableHead>Warranty Provider</TableHead>
+                  <TableHead>Repair Item</TableHead>
+                  <TableHead>Amount Claimed</TableHead>
+                  <TableHead>Claim Date</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {allClaims.map((wc: any) => (
+                  <TableRow key={wc.claim_id}>
+                    <TableCell className="font-semibold">Claim #{wc.claim_id}</TableCell>
+                    <TableCell className="font-medium text-slate-800">{wc.warranty_provider}</TableCell>
+                    <TableCell className="text-xs text-slate-600">{wc.line_item_description}</TableCell>
+                    <TableCell className="font-semibold text-emerald-800">{formatCurr(wc.amount_claimed)}</TableCell>
+                    <TableCell className="text-xs text-slate-400">{wc.claim_date}</TableCell>
+                    <TableCell>{getStatusBadge(wc.status)}</TableCell>
+                  </TableRow>
+                ))}
+                {allClaims.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-6 text-slate-400">No warranty claims logged in the database.</TableCell>
                   </TableRow>
                 )}
               </TableBody>

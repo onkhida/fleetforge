@@ -28,8 +28,6 @@ import {
   CalendarRange,
   BarChart3,
   LogOut,
-  Search,
-  Bell,
   Plus,
   Sparkles,
   Shield,
@@ -269,7 +267,7 @@ function App() {
 
         {/* Content View Scrollable Box */}
         <main className="flex-1 p-8 overflow-y-auto">
-          {activeTab === "inventory" && <InventoryWorkspace />}
+          {activeTab === "inventory" && <InventoryWorkspace employeeShowroomName={employee.showroom_name} />}
           {activeTab === "customers" && <CustomerWorkspace />}
           {activeTab === "checkout" && <CheckoutWorkspace />}
           {activeTab === "financing" && <FinancingWorkspace />}

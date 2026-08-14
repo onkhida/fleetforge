@@ -34,6 +34,9 @@ export const api = {
     request("POST", "/api/inventory/transfer/", { vin, target_showroom_id, employee_id }),
   getMetrics: (showroom_id?: number) => 
     request("GET", `/api/inventory/metrics/${showroom_id ? `?showroom_id=${showroom_id}` : ""}`),
+  updateVehicle: (payload: { vin: string; listing_price: number; color: string; mileage: number; status: string }) =>
+    request("POST", "/api/inventory/update/", payload),
+  deleteVehicle: (vin: string) => request("DELETE", `/api/inventory/delete/?vin=${vin}`),
 
   // Module 3: Customers
   onboardCustomer: (first_name: string, last_name: string, email: string, phone: string, national_id: string) =>
@@ -42,6 +45,15 @@ export const api = {
   checkCredit: (id: number) => request("GET", `/api/customers/credit-check/?id=${id}`),
   searchCustomers: (query: string) => request("GET", `/api/customers/search/?q=${query}`),
   deleteCustomer: (id: number) => request("DELETE", `/api/customers/delete/?id=${id}`),
+  updateCustomer: (payload: {
+    customer_id: number;
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone: string;
+    national_id: string;
+    credit_status?: string;
+  }) => request("POST", "/api/customers/update/", payload),
 
   // Module 4: POS Checkout
   checkout: (payload: {
@@ -79,6 +91,7 @@ export const api = {
     showroom_id?: number;
     odometer_reading: number;
   }) => request("POST", "/api/service/jobs/", payload),
+  getJobs: () => request("GET", "/api/service/jobs/"),
   addLineItem: (payload: {
     service_job_id: number;
     description: string;
@@ -114,4 +127,65 @@ export const api = {
   getOverdueRentals: () => request("GET", "/api/analytics/overdue-leases/"),
   getSalesGrowth: () => request("GET", "/api/analytics/sales-growth/"),
   getProfitMargins: () => request("GET", "/api/analytics/profit-margins/"),
+
+  // Enterprise CRUD Bridges
+  getEmployees: () => request("GET", "/api/employees/"),
+  addEmployee: (payload: {
+    showroom_id: number;
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone?: string;
+    role: string;
+    commission_rate?: number;
+  }) => request("POST", "/api/employees/add/", payload),
+  updateEmployee: (payload: {
+    employee_id: number;
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone?: string;
+    role: string;
+    commission_rate: number;
+    is_active: boolean;
+    showroom_id: number;
+  }) => request("POST", "/api/employees/update/", payload),
+  deleteEmployee: (id: number) => request("DELETE", `/api/employees/delete/?id=${id}`),
+  
+  getShowrooms: () => request("GET", "/api/showrooms/"),
+  addShowroom: (payload: {
+    name: string;
+    address: string;
+    phone?: string;
+    email?: string;
+  }) => request("POST", "/api/showrooms/add/", payload),
+  updateShowroom: (payload: {
+    showroom_id: number;
+    name: string;
+    address: string;
+    phone?: string;
+    email?: string;
+  }) => request("POST", "/api/showrooms/update/", payload),
+  deleteShowroom: (id: number) => request("DELETE", `/api/showrooms/delete/?id=${id}`),
+
+  getSalesRegistry: () => request("GET", "/api/sales/list/"),
+  getPaymentsRegistry: () => request("GET", "/api/finance/payments/list/"),
+  
+  getWarranties: () => request("GET", "/api/service/warranties/"),
+  getWarrantyClaims: () => request("GET", "/api/service/warranty-claims/"),
+
+  getTransfers: () => request("GET", "/api/inventory/transfers/"),
+  approveTransfer: (transfer_id: number) => request("POST", "/api/inventory/transfers/approve/", { transfer_id }),
+  rejectTransfer: (transfer_id: number) => request("POST", "/api/inventory/transfers/reject/", { transfer_id }),
+  addVehicle: (payload: {
+    vin: string;
+    showroom_id: number;
+    make: string;
+    model: string;
+    year: number;
+    color?: string;
+    mileage?: number;
+    purchase_price: number;
+    listing_price: number;
+  }) => request("POST", "/api/inventory/add/", payload),
 };
