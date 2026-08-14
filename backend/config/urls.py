@@ -21,6 +21,7 @@ urlpatterns = [
     path("api/customers/portfolio/", views.api_customers_portfolio, name="api_customers_portfolio"),
     path("api/customers/credit-check/", views.api_customers_credit_check, name="api_customers_credit_check"),
     path("api/customers/search/", views.api_customers_search, name="api_customers_search"),
+    path("api/customers/delete/", views.api_customers_delete, name="api_customers_delete"),
     
     # Module 4: POS Checkout
     path("api/sales/checkout/", views.api_sales_checkout, name="api_sales_checkout"),
@@ -39,6 +40,8 @@ urlpatterns = [
     path("api/rentals/lease/", views.api_rentals_lease, name="api_rentals_lease"),
     path("api/rentals/calculate-fine/", views.api_rentals_calculate_fine, name="api_rentals_calculate_fine"),
     path("api/rentals/return/", views.api_rentals_return, name="api_rentals_return"),
+    path("api/rentals/list/", views.api_rentals_list, name="api_rentals_list"),
+    path("api/rentals/delete/", views.api_rentals_delete, name="api_rentals_delete"),
     
     # Module 8: Analytics
     path("api/analytics/commissions/", views.api_analytics_commissions, name="api_analytics_commissions"),

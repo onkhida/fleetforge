@@ -321,6 +321,27 @@ def api_customers_search(request):
     except DatabaseError as e:
         return JsonResponse({"error": f"Database error: {str(e)}"}, status=500)
 
+@csrf_exempt
+def api_customers_delete(request):
+    """DELETE /api/customers/delete/?id=<id> - Delete a customer profile by ID."""
+    if request.method != "DELETE":
+        return JsonResponse({"error": "Method not allowed."}, status=405)
+    customer_id = request.GET.get("id")
+    if not customer_id:
+        return JsonResponse({"error": "Customer ID is required."}, status=400)
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT customer_id FROM Customer WHERE customer_id = %s", [customer_id])
+            if not cursor.fetchone():
+                return JsonResponse({"error": f"Customer with ID {customer_id} not found."}, status=404)
+                
+            cursor.execute("DELETE FROM Customer WHERE customer_id = %s", [customer_id])
+            return JsonResponse({"message": f"Customer profile {customer_id} successfully deleted."})
+    except DatabaseError as e:
+        # Returns database level constraints errors (foreign key references)
+        return JsonResponse({"error": f"Cannot delete customer: {str(e)}"}, status=400)
+
+
 
 # ----------------------------------------------------
 # Module 4: POS Checkout & Trade-Ins
@@ -602,6 +623,48 @@ def api_rentals_return(request):
             return JsonResponse({"message": "Rental vehicle return transaction executed successfully."})
     except DatabaseError as e:
         return JsonResponse({"error": f"Transaction failed: {str(e)}"}, status=400)
+
+def api_rentals_list(request):
+    """GET /api/rentals/list/ - List all rental agreements."""
+    if request.method != "GET":
+        return JsonResponse({"error": "Method not allowed."}, status=405)
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT rental_id, vin, customer_id, employee_id, start_date, expected_end_date, actual_return_date, daily_rate, status, late_fine_amount "
+                "FROM Rental_Agreement"
+            )
+            rentals = dictfetchall(cursor)
+            return JsonResponse({"rentals": rentals})
+    except DatabaseError as e:
+        return JsonResponse({"error": f"Database error: {str(e)}"}, status=500)
+
+@csrf_exempt
+def api_rentals_delete(request):
+    """DELETE /api/rentals/delete/?id=<id> - Delete a rental agreement by ID."""
+    if request.method != "DELETE":
+        return JsonResponse({"error": "Method not allowed."}, status=405)
+    rental_id = request.GET.get("id")
+    if not rental_id:
+        return JsonResponse({"error": "Rental agreement ID is required."}, status=400)
+    try:
+        with connection.cursor() as cursor:
+            # We first check if the agreement exists
+            cursor.execute("SELECT vin, status FROM Rental_Agreement WHERE rental_id = %s", [rental_id])
+            row = cursor.fetchone()
+            if not row:
+                return JsonResponse({"error": f"Rental agreement with ID {rental_id} not found."}, status=404)
+            vin, status = row
+            
+            # If the rental is active, we should reset the vehicle's status back to 'Available' when deleted
+            if status == "Active" or status == "Overdue":
+                cursor.execute("UPDATE Vehicle SET status = 'Available' WHERE vin = %s", [vin])
+                
+            cursor.execute("DELETE FROM Rental_Agreement WHERE rental_id = %s", [rental_id])
+            return JsonResponse({"message": f"Rental agreement {rental_id} successfully deleted."})
+    except DatabaseError as e:
+        return JsonResponse({"error": f"Database transaction failed: {str(e)}"}, status=400)
+
 
 # ----------------------------------------------------
 # Executive & Showroom Analytics (Admins & Managers Only)
