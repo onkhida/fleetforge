@@ -162,7 +162,7 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 
 # Cookie settings for cross-origin production session support (HTTPS on Vercel)
-if not DEBUG:
+if not DEBUG or os.getenv("VERCEL") == "1":
     SESSION_COOKIE_SAMESITE = "None"
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SAMESITE = "None"
