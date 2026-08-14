@@ -41,6 +41,7 @@ export const api = {
   getCustomerPortfolio: (id: number) => request("GET", `/api/customers/portfolio/?id=${id}`),
   checkCredit: (id: number) => request("GET", `/api/customers/credit-check/?id=${id}`),
   searchCustomers: (query: string) => request("GET", `/api/customers/search/?q=${query}`),
+  deleteCustomer: (id: number) => request("DELETE", `/api/customers/delete/?id=${id}`),
 
   // Module 4: POS Checkout
   checkout: (payload: {
@@ -105,6 +106,8 @@ export const api = {
     return_condition: string;
     is_damaged: boolean;
   }) => request("POST", "/api/rentals/return/", payload),
+  getRentals: () => request("GET", "/api/rentals/list/"),
+  deleteRental: (id: number) => request("DELETE", `/api/rentals/delete/?id=${id}`),
 
   // Module 8: Analytics
   getCommissions: () => request("GET", "/api/analytics/commissions/"),

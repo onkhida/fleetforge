@@ -220,6 +220,19 @@ export const CustomerWorkspace = () => {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
+  const fetchCustomers = async (query: string) => {
+    try {
+      const res = await api.searchCustomers(query);
+      setSearchResults(res.customers || []);
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  useEffect(() => {
+    fetchCustomers("");
+  }, []);
+
   const handleOnboard = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -233,6 +246,7 @@ export const CustomerWorkspace = () => {
       setMessage(res.message);
       setOnboardForm({ first_name: "", last_name: "", email: "", phone: "", national_id: "" });
       setError("");
+      fetchCustomers(searchQuery);
     } catch (err: any) {
       setError(err.message);
       setMessage("");
@@ -240,17 +254,24 @@ export const CustomerWorkspace = () => {
   };
 
   const handleSearch = async () => {
-    if (!searchQuery) return;
+    fetchCustomers(searchQuery);
+    setSelectedCustomer(null);
+    setPortfolio(null);
+    setCredit(null);
+  };
+
+  const handleDeleteCustomer = async (id: number) => {
     try {
-      const res = await api.searchCustomers(searchQuery);
-      setSearchResults(res.customers || []);
+      const res = await api.deleteCustomer(id);
+      setMessage(res.message);
       setError("");
       setSelectedCustomer(null);
       setPortfolio(null);
       setCredit(null);
+      fetchCustomers(searchQuery);
     } catch (err: any) {
       setError(err.message);
-      setSearchResults([]);
+      setMessage("");
     }
   };
 
@@ -338,7 +359,20 @@ export const CustomerWorkspace = () => {
                       <p className="text-slate-800 font-medium">{cust.first_name} {cust.last_name}</p>
                       <p className="text-xs text-slate-400">{cust.email} | {cust.phone}</p>
                     </div>
-                    <Badge className="bg-slate-200 text-slate-700 font-normal">ID: {cust.customer_id}</Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-slate-200 text-slate-700 font-normal">ID: {cust.customer_id}</Badge>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="h-8 px-2 text-xs"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteCustomer(cust.customer_id);
+                        }}
+                      >
+                        Delete
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1001,8 +1035,22 @@ export const RentalWorkspace = () => {
   const [condition, setCondition] = useState("Good");
   const [isDamaged, setIsDamaged] = useState(false);
 
+  const [rentals, setRentals] = useState<any[]>([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  const fetchRentals = async () => {
+    try {
+      const res = await api.getRentals();
+      setRentals(res.rentals || []);
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  useEffect(() => {
+    fetchRentals();
+  }, []);
 
   const handleLease = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1015,9 +1063,12 @@ export const RentalWorkspace = () => {
         daily_rate: parseFloat(leaseForm.daily_rate),
       });
       setMessage(res.message);
+      setError("");
       setLeaseForm({ vin: "", customer_id: "", start_date: "", expected_end_date: "", daily_rate: "" });
-    } catch (e: any) {
-      setError(e.message);
+      fetchRentals();
+    } catch (err: any) {
+      setError(err.message);
+      setMessage("");
     }
   };
 
@@ -1025,10 +1076,10 @@ export const RentalWorkspace = () => {
     if (!returnId || !actualReturnDate) return;
     try {
       const res = await api.calculateFine(returnId, actualReturnDate);
-      setFineResult(res.fine);
+      setFineResult(res.fine.dynamic_fine !== undefined ? res.fine.dynamic_fine : res.fine);
       setError("");
-    } catch (e: any) {
-      setError(e.message);
+    } catch (err: any) {
+      setError(err.message);
       setFineResult(null);
     }
   };
@@ -1043,94 +1094,182 @@ export const RentalWorkspace = () => {
         is_damaged: isDamaged,
       });
       setMessage(res.message);
+      setError("");
       setReturnId(null);
       setFineResult(null);
-    } catch (e: any) {
-      setError(e.message);
+      fetchRentals();
+    } catch (err: any) {
+      setError(err.message);
+      setMessage("");
+    }
+  };
+
+  const handleDeleteRental = async (id: number) => {
+    try {
+      const res = await api.deleteRental(id);
+      setMessage(res.message);
+      setError("");
+      setReturnId(null);
+      setFineResult(null);
+      fetchRentals();
+    } catch (err: any) {
+      setError(err.message);
+      setMessage("");
     }
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Lease Form */}
-      <div className="lg:col-span-1">
-        <Card>
-          <CardHeader><CardTitle>Open Rental Agreement</CardTitle></CardHeader>
-          <CardContent>
-            <form onSubmit={handleLease} className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-700">Vehicle VIN</label>
-                <Input required value={leaseForm.vin} onChange={(e) => setLeaseForm({ ...leaseForm, vin: e.target.value })} />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-700">Customer ID</label>
-                <Input type="number" required value={leaseForm.customer_id} onChange={(e) => setLeaseForm({ ...leaseForm, customer_id: e.target.value })} />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-700">Daily Lease Rate (₵)</label>
-                <Input type="number" required value={leaseForm.daily_rate} onChange={(e) => setLeaseForm({ ...leaseForm, daily_rate: e.target.value })} />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+    <div className="space-y-6">
+      {message && <div className="p-4 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-sm">{message}</div>}
+      {error && <div className="p-4 bg-rose-50 text-rose-800 border border-rose-200 rounded-lg text-sm">{error}</div>}
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Lease Form */}
+        <div className="lg:col-span-1">
+          <Card>
+            <CardHeader><CardTitle>Open Rental Lease</CardTitle></CardHeader>
+            <CardContent>
+              <form onSubmit={handleLease} className="space-y-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-700">Start Date</label>
-                  <Input type="date" required value={leaseForm.start_date} onChange={(e) => setLeaseForm({ ...leaseForm, start_date: e.target.value })} />
+                  <label className="text-xs font-medium text-slate-700">Vehicle VIN</label>
+                  <Input required value={leaseForm.vin} onChange={(e) => setLeaseForm({ ...leaseForm, vin: e.target.value })} />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-700">Expected End</label>
-                  <Input type="date" required value={leaseForm.expected_end_date} onChange={(e) => setLeaseForm({ ...leaseForm, expected_end_date: e.target.value })} />
+                  <label className="text-xs font-medium text-slate-700">Customer ID</label>
+                  <Input type="number" required value={leaseForm.customer_id} onChange={(e) => setLeaseForm({ ...leaseForm, customer_id: e.target.value })} />
                 </div>
-              </div>
-              <Button type="submit" className="w-full">Authorize Lease Contract</Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Return check-in Desk */}
-      <div className="lg:col-span-2 space-y-6">
-        {message && <div className="p-4 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-sm">{message}</div>}
-        {error && <div className="p-4 bg-rose-50 text-rose-800 border border-rose-200 rounded-lg text-sm">{error}</div>}
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Rental check-in Desk</CardTitle>
-            <CardDescription>Close active lease agreement contracts and process returns.</CardDescription>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-500">Rental Agreement ID</label>
-                <Input type="number" value={returnId || ""} onChange={(e) => setReturnId(parseInt(e.target.value))} />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-500">Actual Return Date</label>
-                <Input type="date" value={actualReturnDate} onChange={(e) => setActualReturnDate(e.target.value)} />
-              </div>
-            </div>
-            <Button onClick={handleReturnQuery} className="mt-4">Evaluate check-in Fines</Button>
-          </CardHeader>
-
-          {fineResult !== null && (
-            <CardContent className="space-y-6 border-t border-slate-100 pt-6">
-              <div className="p-4 bg-slate-50 border border-slate-100 rounded-lg flex flex-row items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-slate-500">DYNAMIC CHECK-IN LATE FINE</p>
-                  <p className="text-2xl font-bold text-slate-800 mt-1">{formatCurr(fineResult)}</p>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-700">Daily Lease Rate (₵)</label>
+                  <Input type="number" required value={leaseForm.daily_rate} onChange={(e) => setLeaseForm({ ...leaseForm, daily_rate: e.target.value })} />
                 </div>
-                <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-medium text-slate-700">Return Condition</label>
-                    <Input value={condition} onChange={(e) => setCondition(e.target.value)} />
+                    <label className="text-xs font-medium text-slate-700">Start Date</label>
+                    <Input type="date" required value={leaseForm.start_date} onChange={(e) => setLeaseForm({ ...leaseForm, start_date: e.target.value })} />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <input type="checkbox" id="is_damaged" checked={isDamaged} onChange={(e) => setIsDamaged(e.target.checked)} />
-                    <label htmlFor="is_damaged" className="text-xs font-medium text-slate-700">Vehicle is Damaged</label>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-slate-700">Expected End</label>
+                    <Input type="date" required value={leaseForm.expected_end_date} onChange={(e) => setLeaseForm({ ...leaseForm, expected_end_date: e.target.value })} />
                   </div>
                 </div>
-              </div>
-              <Button onClick={handleProcessReturn} className="w-full">Process Return Transaction</Button>
+                <Button type="submit" className="w-full">Authorize Lease Contract</Button>
+              </form>
             </CardContent>
-          )}
-        </Card>
+          </Card>
+        </div>
+
+        {/* Return check-in Desk */}
+        <div className="lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Rental Check-in Desk</CardTitle>
+              <CardDescription>Close active lease agreement contracts and process returns.</CardDescription>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-500">Rental Agreement ID</label>
+                  <Input type="number" placeholder="Select a rental from table or enter ID..." value={returnId || ""} onChange={(e) => setReturnId(parseInt(e.target.value))} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-500">Actual Return Date</label>
+                  <Input type="date" value={actualReturnDate} onChange={(e) => setActualReturnDate(e.target.value)} />
+                </div>
+              </div>
+              <Button onClick={handleReturnQuery} className="mt-4">Evaluate Check-in Fines</Button>
+            </CardHeader>
+
+            {fineResult !== null && (
+              <CardContent className="space-y-6 border-t border-slate-100 pt-6">
+                <div className="p-4 bg-slate-50 border border-slate-100 rounded-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-medium text-slate-500">DYNAMIC CHECK-IN LATE FINE</p>
+                    <p className="text-2xl font-bold text-slate-800 mt-1">{formatCurr(fineResult)}</p>
+                  </div>
+                  <div className="space-y-4 w-full md:w-auto">
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-slate-700">Return Condition</label>
+                      <Input value={condition} onChange={(e) => setCondition(e.target.value)} />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input type="checkbox" id="is_damaged" checked={isDamaged} onChange={(e) => setIsDamaged(e.target.checked)} />
+                      <label htmlFor="is_damaged" className="text-xs font-medium text-slate-700">Vehicle is Damaged</label>
+                    </div>
+                  </div>
+                </div>
+                <Button onClick={handleProcessReturn} className="w-full">Process Return Transaction</Button>
+              </CardContent>
+            )}
+          </Card>
+        </div>
       </div>
+
+      {/* List of Rental Agreements (CRUD Table) */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Active & Historic Rental Agreements</CardTitle>
+          <CardDescription>View, select for return check-in, or delete lease contracts from the database.</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0 border-t border-slate-100">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Rental ID</TableHead>
+                <TableHead>Vehicle VIN</TableHead>
+                <TableHead>Customer ID</TableHead>
+                <TableHead>Start Date</TableHead>
+                <TableHead>Expected End Date</TableHead>
+                <TableHead>Return Date</TableHead>
+                <TableHead>Daily Rate</TableHead>
+                <TableHead>Late Fine</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rentals.map((r: any) => (
+                <TableRow key={r.rental_id}>
+                  <TableCell className="font-semibold">#{r.rental_id}</TableCell>
+                  <TableCell className="font-mono text-xs">{r.vin}</TableCell>
+                  <TableCell>Customer #{r.customer_id}</TableCell>
+                  <TableCell>{r.start_date}</TableCell>
+                  <TableCell>{r.expected_end_date}</TableCell>
+                  <TableCell>{r.actual_return_date || "—"}</TableCell>
+                  <TableCell>{formatCurr(r.daily_rate)}</TableCell>
+                  <TableCell>{r.late_fine_amount ? formatCurr(r.late_fine_amount) : "₵0.00"}</TableCell>
+                  <TableCell>{getStatusBadge(r.status)}</TableCell>
+                  <TableCell className="text-right space-x-2">
+                    {r.status !== "Returned" && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => {
+                          setReturnId(r.rental_id);
+                          setError("");
+                          setMessage("");
+                          setFineResult(null);
+                        }}
+                      >
+                        Select for Return
+                      </Button>
+                    )}
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      onClick={() => handleDeleteRental(r.rental_id)}
+                    >
+                      Delete
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {rentals.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={10} className="text-center py-6 text-slate-400">No rental agreements logged in the database.</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 };

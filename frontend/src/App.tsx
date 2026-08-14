@@ -92,12 +92,21 @@ function App() {
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-600 block mb-1">Email Address</label>
                 <Input
                   type="email"
                   placeholder="name@apexmotors.com"
                   required
                   value={emailInput}
                   onChange={(e) => setEmailInput(e.target.value)}
+                  className="h-10 border-slate-300 focus-visible:ring-slate-400"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-600 block mb-1">Password</label>
+                <Input
+                  type="password"
+                  placeholder="At least 12 characters"
                   className="h-10 border-slate-300 focus-visible:ring-slate-400"
                 />
               </div>
@@ -126,63 +135,56 @@ function App() {
           <nav className="space-y-1">
             <button
               onClick={() => setActiveTab("inventory")}
-              className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                activeTab === "inventory" ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              }`}
+              className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === "inventory" ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                }`}
             >
               <Icons.Car />
               Vehicles Inventory
             </button>
             <button
               onClick={() => setActiveTab("customers")}
-              className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                activeTab === "customers" ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              }`}
+              className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === "customers" ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                }`}
             >
               <Icons.Users />
               Customers Portfolio
             </button>
             <button
               onClick={() => setActiveTab("checkout")}
-              className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                activeTab === "checkout" ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              }`}
+              className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === "checkout" ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                }`}
             >
               <Icons.Key />
               POS Sales Checkout
             </button>
             <button
               onClick={() => setActiveTab("financing")}
-              className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                activeTab === "financing" ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              }`}
+              className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === "financing" ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                }`}
             >
               <Icons.Cash />
               BHPH Financing
             </button>
             <button
               onClick={() => setActiveTab("service")}
-              className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                activeTab === "service" ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              }`}
+              className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === "service" ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                }`}
             >
               <Icons.Wrench />
               Service Bay Queue
             </button>
             <button
               onClick={() => setActiveTab("rentals")}
-              className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                activeTab === "rentals" ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              }`}
+              className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === "rentals" ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                }`}
             >
               <Icons.Calendar />
               Rental Operations
             </button>
             <button
               onClick={() => setActiveTab("analytics")}
-              className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                activeTab === "analytics" ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              }`}
+              className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === "analytics" ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                }`}
             >
               <Icons.Chart />
               Executive Analytics
