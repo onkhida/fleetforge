@@ -87,6 +87,7 @@ export const InventoryWorkspace = ({ employeeShowroomName }: { employeeShowroomN
   const [editVehicleForm, setEditVehicleForm] = useState<any>(null);
   const [isTransfersRestricted, setTransfersRestricted] = useState(false);
   const [isShowroomsRestricted, setShowroomsRestricted] = useState(false);
+  const [isLoading, setLoading] = useState(true);
 
   const handleUpdateShowroom = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,6 +152,7 @@ export const InventoryWorkspace = ({ employeeShowroomName }: { employeeShowroomN
   };
 
   const refreshData = async () => {
+    setLoading(true);
     try {
       const invData = await api.getInventory();
       setVehicles(invData.inventory || []);
@@ -182,6 +184,7 @@ export const InventoryWorkspace = ({ employeeShowroomName }: { employeeShowroomN
       console.warn("Transfers restricted:", e.message);
       setTransfersRestricted(true);
     }
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -336,31 +339,49 @@ export const InventoryWorkspace = ({ employeeShowroomName }: { employeeShowroomN
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((v: any) => (
-                <TableRow key={v.vin}>
-                  <TableCell className="font-mono text-xs text-slate-600">{v.vin}</TableCell>
-                  <TableCell className="font-medium text-slate-800">{v.make} {v.model}</TableCell>
-                  <TableCell>{v.year}</TableCell>
-                  <TableCell>{v.color}</TableCell>
-                  <TableCell className="text-slate-600">
-                    <span className="flex items-center gap-1.5">
-                      {v.showroom_name}
-                      {employeeShowroomName && v.showroom_name === employeeShowroomName && (
-                        <Badge className="bg-slate-900 text-white font-normal text-[9px] px-1.5 py-0.5 border-none leading-none shrink-0">Home</Badge>
-                      )}
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8 text-slate-400">
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600 inline-block" />
+                      Syncing lot inventory...
                     </span>
                   </TableCell>
-                  <TableCell className="font-medium">{formatCurr(v.listing_price)}</TableCell>
-                  <TableCell>{getStatusBadge(v.status)}</TableCell>
-                  <TableCell className="text-right space-x-2">
-                    {v.status === "Available" && (
-                      <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setTransferVin(v.vin)}>Transfer</Button>
-                    )}
-                    <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setEditVehicleForm(v)}>Edit</Button>
-                    <Button size="sm" variant="destructive" className="h-8 text-xs" onClick={() => handleDeleteVehicle(v.vin)}>Delete</Button>
-                  </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                <>
+                  {filtered.map((v: any) => (
+                    <TableRow key={v.vin}>
+                      <TableCell className="font-mono text-xs text-slate-600">{v.vin}</TableCell>
+                      <TableCell className="font-medium text-slate-800">{v.make} {v.model}</TableCell>
+                      <TableCell>{v.year}</TableCell>
+                      <TableCell>{v.color}</TableCell>
+                      <TableCell className="text-slate-600">
+                        <span className="flex items-center gap-1.5">
+                          {v.showroom_name}
+                          {employeeShowroomName && v.showroom_name === employeeShowroomName && (
+                            <Badge className="bg-slate-900 text-white font-normal text-[9px] px-1.5 py-0.5 border-none leading-none shrink-0">Home</Badge>
+                          )}
+                        </span>
+                      </TableCell>
+                      <TableCell className="font-medium">{formatCurr(v.listing_price)}</TableCell>
+                      <TableCell>{getStatusBadge(v.status)}</TableCell>
+                      <TableCell className="text-right space-x-2">
+                        {v.status === "Available" && (
+                          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setTransferVin(v.vin)}>Transfer</Button>
+                        )}
+                        <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setEditVehicleForm(v)}>Edit</Button>
+                        <Button size="sm" variant="destructive" className="h-8 text-xs" onClick={() => handleDeleteVehicle(v.vin)}>Delete</Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {filtered.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-6 text-slate-400">No vehicles found matching search.</TableCell>
+                    </TableRow>
+                  )}
+                </>
+              )}
             </TableBody>
           </Table>
         </CardContent>
@@ -392,28 +413,41 @@ export const InventoryWorkspace = ({ employeeShowroomName }: { employeeShowroomN
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {transfers.map((t: any) => (
-                    <TableRow key={t.transfer_id}>
-                      <TableCell className="font-mono text-xs">{t.vin}</TableCell>
-                      <TableCell>{t.source_showroom_name}</TableCell>
-                      <TableCell>{t.target_showroom_name}</TableCell>
-                      <TableCell>{getStatusBadge(t.status)}</TableCell>
-                      <TableCell className="text-right space-x-2">
-                        {t.status === "Pending" ? (
-                          <>
-                            <Button size="sm" variant="outline" className="text-emerald-600 hover:text-emerald-700 h-8" onClick={() => handleApproveTransfer(t.transfer_id)}>Approve</Button>
-                            <Button size="sm" variant="outline" className="text-rose-600 hover:text-rose-700 h-8" onClick={() => handleRejectTransfer(t.transfer_id)}>Reject</Button>
-                          </>
-                        ) : (
-                          <span className="text-xs text-slate-400 font-medium">—</span>
-                        )}
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-6 text-slate-400">
+                        <span className="flex items-center justify-center gap-2">
+                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600 inline-block" />
+                          Syncing stock transfers queue...
+                        </span>
                       </TableCell>
                     </TableRow>
-                  ))}
-                  {transfers.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-6 text-slate-400">No stock transfers logged in the database.</TableCell>
-                    </TableRow>
+                  ) : (
+                    <>
+                      {transfers.map((t: any) => (
+                        <TableRow key={t.transfer_id}>
+                          <TableCell className="font-mono text-xs">{t.vin}</TableCell>
+                          <TableCell>{t.source_showroom_name}</TableCell>
+                          <TableCell>{t.target_showroom_name}</TableCell>
+                          <TableCell>{getStatusBadge(t.status)}</TableCell>
+                          <TableCell className="text-right space-x-2">
+                            {t.status === "Pending" ? (
+                              <>
+                                <Button size="sm" variant="outline" className="text-emerald-600 hover:text-emerald-700 h-8" onClick={() => handleApproveTransfer(t.transfer_id)}>Approve</Button>
+                                <Button size="sm" variant="outline" className="text-rose-600 hover:text-rose-700 h-8" onClick={() => handleRejectTransfer(t.transfer_id)}>Reject</Button>
+                              </>
+                            ) : (
+                              <span className="text-xs text-slate-400 font-medium">—</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {transfers.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-6 text-slate-400">No stock transfers logged in the database.</TableCell>
+                        </TableRow>
+                      )}
+                    </>
                   )}
                 </TableBody>
               </Table>
@@ -446,18 +480,31 @@ export const InventoryWorkspace = ({ employeeShowroomName }: { employeeShowroomN
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {showrooms.map((s: any) => (
-                    <TableRow key={s.showroom_id}>
-                      <TableCell className="font-semibold text-slate-800">Showroom #{s.showroom_id}</TableCell>
-                      <TableCell className="font-medium text-slate-800">{s.name}</TableCell>
-                      <TableCell className="text-slate-600 text-xs">{s.address}</TableCell>
-                      <TableCell className="text-slate-500 text-xs">{s.phone || s.email || "—"}</TableCell>
-                      <TableCell className="text-right space-x-2">
-                        <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setEditShowroomForm(s)}>Edit</Button>
-                        <Button size="sm" variant="destructive" className="h-8 text-xs" onClick={() => handleDeleteShowroom(s.showroom_id)}>Delete</Button>
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-6 text-slate-400">
+                        <span className="flex items-center justify-center gap-2">
+                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600 inline-block" />
+                          Syncing showrooms directory...
+                        </span>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    <>
+                      {showrooms.map((s: any) => (
+                        <TableRow key={s.showroom_id}>
+                          <TableCell className="font-semibold text-slate-800">Showroom #{s.showroom_id}</TableCell>
+                          <TableCell className="font-medium text-slate-800">{s.name}</TableCell>
+                          <TableCell className="text-slate-600 text-xs">{s.address}</TableCell>
+                          <TableCell className="text-slate-500 text-xs">{s.phone || s.email || "—"}</TableCell>
+                          <TableCell className="text-right space-x-2">
+                            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setEditShowroomForm(s)}>Edit</Button>
+                            <Button size="sm" variant="destructive" className="h-8 text-xs" onClick={() => handleDeleteShowroom(s.showroom_id)}>Delete</Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -707,6 +754,7 @@ export const CustomerWorkspace = () => {
   const [hireForm, setHireForm] = useState({ first_name: "", last_name: "", email: "", phone: "", role: "Salesperson", showroom_id: "", commission_rate: "0.05" });
   const [hireDialogOpen, setHireDialogOpen] = useState(false);
   const [isEmployeesRestricted, setEmployeesRestricted] = useState(false);
+  const [isLoading, setLoading] = useState(true);
 
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -758,6 +806,7 @@ export const CustomerWorkspace = () => {
   };
 
   const fetchEmployees = async () => {
+    setLoading(true);
     try {
       const res = await api.getEmployees();
       setEmployees(res.employees || []);
@@ -773,6 +822,7 @@ export const CustomerWorkspace = () => {
     } catch (err: any) {
       console.warn("Showrooms restricted in CustomerWorkspace:", err.message);
     }
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -1141,32 +1191,50 @@ export const CustomerWorkspace = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {employees.map((emp: any) => (
-                  <TableRow key={emp.employee_id}>
-                    <TableCell className="font-semibold">Staff #{emp.employee_id}</TableCell>
-                    <TableCell className="font-medium text-slate-800">{emp.first_name} {emp.last_name}</TableCell>
-                    <TableCell className="text-xs text-slate-500">{emp.email}</TableCell>
-                    <TableCell>
-                      <Badge className="bg-slate-100 text-slate-800 border-slate-200 border font-normal capitalize">
-                        {emp.role}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-slate-600 text-xs">{emp.showroom_name}</TableCell>
-                    <TableCell className="font-medium">{Math.round(emp.commission_rate * 100)}%</TableCell>
-                    <TableCell className="text-xs text-slate-400">{emp.hire_date}</TableCell>
-                    <TableCell>
-                      {emp.is_active ? (
-                        <Badge className="bg-emerald-55 text-emerald-805 border-emerald-105 border font-normal">Active</Badge>
-                      ) : (
-                        <Badge className="bg-slate-101 text-slate-405 border-slate-205 border font-normal">Inactive</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right space-x-2">
-                      <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setEditEmployeeForm(emp)}>Edit</Button>
-                      <Button size="sm" variant="destructive" className="h-8 text-xs" onClick={() => handleDeleteEmployee(emp.employee_id)}>Delete</Button>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8 text-slate-400">
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600 inline-block" />
+                        Syncing personnel files...
+                      </span>
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  <>
+                    {employees.map((emp: any) => (
+                      <TableRow key={emp.employee_id}>
+                        <TableCell className="font-semibold">Staff #{emp.employee_id}</TableCell>
+                        <TableCell className="font-medium text-slate-800">{emp.first_name} {emp.last_name}</TableCell>
+                        <TableCell className="text-xs text-slate-500">{emp.email}</TableCell>
+                        <TableCell>
+                          <Badge className="bg-slate-100 text-slate-800 border-slate-200 border font-normal capitalize">
+                            {emp.role}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-slate-600 text-xs">{emp.showroom_name}</TableCell>
+                        <TableCell className="font-medium">{Math.round(emp.commission_rate * 100)}%</TableCell>
+                        <TableCell className="text-xs text-slate-400">{emp.hire_date}</TableCell>
+                        <TableCell>
+                          {emp.is_active ? (
+                            <Badge className="bg-emerald-55 text-emerald-805 border-emerald-105 border font-normal">Active</Badge>
+                          ) : (
+                            <Badge className="bg-slate-101 text-slate-405 border-slate-205 border font-normal">Inactive</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right space-x-2">
+                          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setEditEmployeeForm(emp)}>Edit</Button>
+                          <Button size="sm" variant="destructive" className="h-8 text-xs" onClick={() => handleDeleteEmployee(emp.employee_id)}>Delete</Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {employees.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={9} className="text-center py-6 text-slate-400">No personnel records logged.</TableCell>
+                      </TableRow>
+                    )}
+                  </>
+                )}
               </TableBody>
             </Table>
           </CardContent>
@@ -1418,8 +1486,10 @@ export const CheckoutWorkspace = () => {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isSalesRestricted, setSalesRestricted] = useState(false);
+  const [isLoading, setLoading] = useState(true);
 
   const fetchSales = async () => {
+    setLoading(true);
     try {
       const res = await api.getSalesRegistry();
       setSales(res.sales || []);
@@ -1428,6 +1498,7 @@ export const CheckoutWorkspace = () => {
       console.warn("Sales ledger restricted:", e.message);
       setSalesRestricted(true);
     }
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -1617,21 +1688,34 @@ export const CheckoutWorkspace = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sales.map((s: any) => (
-                      <TableRow key={s.sale_id}>
-                        <TableCell className="font-semibold">Sale #{s.sale_id}</TableCell>
-                        <TableCell className="font-mono text-xs text-slate-600">{s.vin}</TableCell>
-                        <TableCell className="text-xs font-medium text-slate-800">{s.customer_first_name} {s.customer_last_name}</TableCell>
-                        <TableCell className="text-xs text-slate-500">{s.employee_first_name} {s.employee_last_name}</TableCell>
-                        <TableCell className="font-semibold">{formatCurr(s.final_price)}</TableCell>
-                        <TableCell className="font-semibold text-emerald-800">{formatCurr(s.commission_amount)}</TableCell>
-                        <TableCell className="text-xs text-slate-400">{s.sale_date}</TableCell>
-                      </TableRow>
-                    ))}
-                    {sales.length === 0 && (
+                    {isLoading ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-6 text-slate-400">No sale transactions logged in the database.</TableCell>
+                        <TableCell colSpan={7} className="text-center py-8 text-slate-400">
+                          <span className="flex items-center justify-center gap-2">
+                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600 inline-block" />
+                            Syncing sales transactions...
+                          </span>
+                        </TableCell>
                       </TableRow>
+                    ) : (
+                      <>
+                        {sales.map((s: any) => (
+                          <TableRow key={s.sale_id}>
+                            <TableCell className="font-semibold">Sale #{s.sale_id}</TableCell>
+                            <TableCell className="font-mono text-xs text-slate-600">{s.vin}</TableCell>
+                            <TableCell className="text-xs font-medium text-slate-800">{s.customer_first_name} {s.customer_last_name}</TableCell>
+                            <TableCell className="text-xs text-slate-500">{s.employee_first_name} {s.employee_last_name}</TableCell>
+                            <TableCell className="font-semibold">{formatCurr(s.final_price)}</TableCell>
+                            <TableCell className="font-semibold text-emerald-800">{formatCurr(s.commission_amount)}</TableCell>
+                            <TableCell className="text-xs text-slate-400">{s.sale_date}</TableCell>
+                          </TableRow>
+                        ))}
+                        {sales.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={7} className="text-center py-6 text-slate-400">No sale transactions logged in the database.</TableCell>
+                          </TableRow>
+                        )}
+                      </>
                     )}
                   </TableBody>
                 </Table>
@@ -1658,6 +1742,7 @@ export const FinancingWorkspace = () => {
   const [error, setError] = useState("");
   const [isLoansRestricted, setLoansRestricted] = useState(false);
   const [isPaymentsRestricted, setPaymentsRestricted] = useState(false);
+  const [isLoading, setLoading] = useState(true);
 
   const refreshLoans = async () => {
     try {
@@ -1681,9 +1766,11 @@ export const FinancingWorkspace = () => {
     }
   };
 
-  const refreshAll = () => {
-    refreshLoans();
-    refreshPayments();
+  const refreshAll = async () => {
+    setLoading(true);
+    await refreshLoans();
+    await refreshPayments();
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -1794,28 +1881,41 @@ export const FinancingWorkspace = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {loans.map((loan: any) => (
-                      <TableRow key={loan.loan_id}>
-                        <TableCell className="font-semibold">Loan #{loan.loan_id}</TableCell>
-                        <TableCell className="font-medium text-slate-800">{loan.customer_first_name} {loan.customer_last_name}</TableCell>
-                        <TableCell className="font-semibold text-rose-600">{formatCurr(loan.principal_balance)}</TableCell>
-                        <TableCell>{formatCurr(loan.down_payment)}</TableCell>
-                        <TableCell>{loan.interest_rate}%</TableCell>
-                        <TableCell>{loan.term_months}mo</TableCell>
-                        <TableCell>{getStatusBadge(loan.status)}</TableCell>
-                        <TableCell className="text-right">
-                          {loan.status === "Active" ? (
-                            <Button size="sm" variant="outline" className="h-8" onClick={() => setPayLoanId(loan.loan_id)}>Log Payment</Button>
-                          ) : (
-                            <span className="text-xs text-slate-400 font-medium px-4">—</span>
-                          )}
+                    {isLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center py-8 text-slate-400">
+                          <span className="flex items-center justify-center gap-2">
+                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600 inline-block" />
+                            Syncing active credit portfolios...
+                          </span>
                         </TableCell>
                       </TableRow>
-                    ))}
-                    {loans.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={8} className="text-center py-6 text-slate-400">No active financing contracts logged.</TableCell>
-                      </TableRow>
+                    ) : (
+                      <>
+                        {loans.map((loan: any) => (
+                          <TableRow key={loan.loan_id}>
+                            <TableCell className="font-semibold">Loan #{loan.loan_id}</TableCell>
+                            <TableCell className="font-medium text-slate-800">{loan.customer_first_name} {loan.customer_last_name}</TableCell>
+                            <TableCell className="font-semibold text-rose-600">{formatCurr(loan.principal_balance)}</TableCell>
+                            <TableCell>{formatCurr(loan.down_payment)}</TableCell>
+                            <TableCell>{loan.interest_rate}%</TableCell>
+                            <TableCell>{loan.term_months}mo</TableCell>
+                            <TableCell>{getStatusBadge(loan.status)}</TableCell>
+                            <TableCell className="text-right">
+                              {loan.status === "Active" ? (
+                                <Button size="sm" variant="outline" className="h-8" onClick={() => setPayLoanId(loan.loan_id)}>Log Payment</Button>
+                              ) : (
+                                <span className="text-xs text-slate-400 font-medium px-4">—</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        {loans.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={8} className="text-center py-6 text-slate-400">No active financing contracts logged.</TableCell>
+                          </TableRow>
+                        )}
+                      </>
                     )}
                   </TableBody>
                 </Table>
@@ -1852,25 +1952,38 @@ export const FinancingWorkspace = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {payments.map((p: any) => (
-                  <TableRow key={p.payment_id}>
-                    <TableCell className="font-semibold">Receipt #{p.payment_id}</TableCell>
-                    <TableCell className="font-semibold">Loan #{p.loan_id}</TableCell>
-                    <TableCell className="font-medium text-slate-800">{p.customer_first} {p.customer_last}</TableCell>
-                    <TableCell className="font-semibold text-emerald-800">{formatCurr(p.amount)}</TableCell>
-                    <TableCell className="capitalize text-slate-600 text-xs">{p.payment_method.replace("_", " ")}</TableCell>
-                    <TableCell className="text-xs text-slate-400">{p.payment_date}</TableCell>
-                    <TableCell>
-                      <Badge className="bg-emerald-50 text-emerald-800 border-emerald-100 border font-normal">
-                        {p.receipt_status}
-                      </Badge>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-slate-400">
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600 inline-block" />
+                        Syncing installment ledger...
+                      </span>
                     </TableCell>
                   </TableRow>
-                ))}
-                {payments.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-6 text-slate-400">No payment receipts logged in the database.</TableCell>
-                  </TableRow>
+                ) : (
+                  <>
+                    {payments.map((p: any) => (
+                      <TableRow key={p.payment_id}>
+                        <TableCell className="font-semibold">Receipt #{p.payment_id}</TableCell>
+                        <TableCell className="font-semibold">Loan #{p.loan_id}</TableCell>
+                        <TableCell className="font-medium text-slate-800">{p.customer_first} {p.customer_last}</TableCell>
+                        <TableCell className="font-semibold text-emerald-800">{formatCurr(p.amount)}</TableCell>
+                        <TableCell className="capitalize text-slate-600 text-xs">{p.payment_method.replace("_", " ")}</TableCell>
+                        <TableCell className="text-xs text-slate-400">{p.payment_date}</TableCell>
+                        <TableCell>
+                          <Badge className="bg-emerald-50 text-emerald-800 border-emerald-100 border font-normal">
+                            {p.receipt_status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {payments.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-6 text-slate-400">No payment receipts logged in the database.</TableCell>
+                      </TableRow>
+                    )}
+                  </>
                 )}
               </TableBody>
             </Table>
@@ -1917,8 +2030,10 @@ const ServiceJobsList = ({ onRefreshNeeded }: { onRefreshNeeded?: () => void }) 
   const [editJobForm, setEditJobForm] = useState<any>(null);
   const [activeJobId, setActiveJobId] = useState<number | null>(null);
   const [selectedJobItems, setSelectedJobItems] = useState<any[] | null>(null);
+  const [isLoading, setLoading] = useState(true);
 
   const fetchJobs = async () => {
+    setLoading(true);
     try {
       const res = await api.getJobs();
       setJobs(res.jobs || []);
@@ -1927,6 +2042,7 @@ const ServiceJobsList = ({ onRefreshNeeded }: { onRefreshNeeded?: () => void }) 
       console.warn("Jobs restricted:", e.message);
       setRestricted(true);
     }
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -2001,27 +2117,40 @@ const ServiceJobsList = ({ onRefreshNeeded }: { onRefreshNeeded?: () => void }) 
             </TableRow>
           </TableHeader>
           <TableBody>
-            {jobs.map((j: any) => (
-              <TableRow key={j.service_job_id}>
-                <TableCell className="font-semibold">Job #{j.service_job_id}</TableCell>
-                <TableCell className="font-mono text-xs text-slate-600">{j.vin}</TableCell>
-                <TableCell className="text-xs font-medium text-slate-800">{j.customer_first} {j.customer_last}</TableCell>
-                <TableCell className="text-xs text-slate-600">{j.employee_first} {j.employee_last}</TableCell>
-                <TableCell className="text-xs text-slate-500">{j.showroom_name}</TableCell>
-                <TableCell className="text-xs">{j.odometer_reading.toLocaleString()} mi</TableCell>
-                <TableCell className="font-semibold text-slate-800">{formatCurr(j.total_cost || 0)}</TableCell>
-                <TableCell>{getStatusBadge(j.status)}</TableCell>
-                <TableCell className="text-right space-x-2">
-                  <Button size="sm" variant="outline" className="h-8 text-xs text-blue-600 hover:text-blue-700" onClick={() => handleViewItems(j.service_job_id)}>View Items</Button>
-                  <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setEditJobForm(j)}>Edit</Button>
-                  <Button size="sm" variant="destructive" className="h-8 text-xs" onClick={() => handleDeleteJob(j.service_job_id)}>Delete</Button>
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={9} className="text-center py-8 text-slate-400">
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600 inline-block" />
+                    Syncing service bay queue...
+                  </span>
                 </TableCell>
               </TableRow>
-            ))}
-            {jobs.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={9} className="text-center py-6 text-slate-400">No active service orders in queue.</TableCell>
-              </TableRow>
+            ) : (
+              <>
+                {jobs.map((j: any) => (
+                  <TableRow key={j.service_job_id}>
+                    <TableCell className="font-semibold">Job #{j.service_job_id}</TableCell>
+                    <TableCell className="font-mono text-xs text-slate-600">{j.vin}</TableCell>
+                    <TableCell className="text-xs font-medium text-slate-800">{j.customer_first} {j.customer_last}</TableCell>
+                    <TableCell className="text-xs text-slate-600">{j.employee_first} {j.employee_last}</TableCell>
+                    <TableCell className="text-xs text-slate-500">{j.showroom_name}</TableCell>
+                    <TableCell className="text-xs">{j.odometer_reading.toLocaleString()} mi</TableCell>
+                    <TableCell className="font-semibold text-slate-800">{formatCurr(j.total_cost || 0)}</TableCell>
+                    <TableCell>{getStatusBadge(j.status)}</TableCell>
+                    <TableCell className="text-right space-x-2">
+                      <Button size="sm" variant="outline" className="h-8 text-xs text-blue-600 hover:text-blue-700" onClick={() => handleViewItems(j.service_job_id)}>View Items</Button>
+                      <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setEditJobForm(j)}>Edit</Button>
+                      <Button size="sm" variant="destructive" className="h-8 text-xs" onClick={() => handleDeleteJob(j.service_job_id)}>Delete</Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {jobs.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-6 text-slate-400">No active service orders in queue.</TableCell>
+                  </TableRow>
+                )}
+              </>
             )}
           </TableBody>
         </Table>
@@ -2424,8 +2553,10 @@ export const RentalWorkspace = () => {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isRentalsRestricted, setRentalsRestricted] = useState(false);
+  const [isLoading, setLoading] = useState(true);
 
   const fetchRentals = async () => {
+    setLoading(true);
     try {
       const res = await api.getRentals();
       setRentals(res.rentals || []);
@@ -2434,6 +2565,7 @@ export const RentalWorkspace = () => {
       console.warn("Rentals restricted:", err.message);
       setRentalsRestricted(true);
     }
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -2620,46 +2752,59 @@ export const RentalWorkspace = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rentals.map((r: any) => (
-                  <TableRow key={r.rental_id}>
-                    <TableCell className="font-semibold">#{r.rental_id}</TableCell>
-                    <TableCell className="font-mono text-xs">{r.vin}</TableCell>
-                    <TableCell>Customer #{r.customer_id}</TableCell>
-                    <TableCell>{r.start_date}</TableCell>
-                    <TableCell>{r.expected_end_date}</TableCell>
-                    <TableCell>{r.actual_return_date || "—"}</TableCell>
-                    <TableCell>{formatCurr(r.daily_rate)}</TableCell>
-                    <TableCell>{r.late_fine_amount ? formatCurr(r.late_fine_amount) : "₵0.00"}</TableCell>
-                    <TableCell>{getStatusBadge(r.status)}</TableCell>
-                    <TableCell className="text-right space-x-2">
-                      {r.status !== "Returned" && (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => {
-                            setReturnId(r.rental_id);
-                            setError("");
-                            setMessage("");
-                            setFineResult(null);
-                          }}
-                        >
-                          Select for Return
-                        </Button>
-                      )}
-                      <Button 
-                        variant="destructive" 
-                        size="sm" 
-                        onClick={() => handleDeleteRental(r.rental_id)}
-                      >
-                        Delete
-                      </Button>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={10} className="text-center py-8 text-slate-400">
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600 inline-block" />
+                        Syncing active lease registry...
+                      </span>
                     </TableCell>
                   </TableRow>
-                ))}
-                {rentals.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={10} className="text-center py-6 text-slate-400">No rental agreements logged in the database.</TableCell>
-                  </TableRow>
+                ) : (
+                  <>
+                    {rentals.map((r: any) => (
+                      <TableRow key={r.rental_id}>
+                        <TableCell className="font-semibold">#{r.rental_id}</TableCell>
+                        <TableCell className="font-mono text-xs">{r.vin}</TableCell>
+                        <TableCell>Customer #{r.customer_id}</TableCell>
+                        <TableCell>{r.start_date}</TableCell>
+                        <TableCell>{r.expected_end_date}</TableCell>
+                        <TableCell>{r.actual_return_date || "—"}</TableCell>
+                        <TableCell>{formatCurr(r.daily_rate)}</TableCell>
+                        <TableCell>{r.late_fine_amount ? formatCurr(r.late_fine_amount) : "₵0.00"}</TableCell>
+                        <TableCell>{getStatusBadge(r.status)}</TableCell>
+                        <TableCell className="text-right space-x-2">
+                          {r.status !== "Returned" && (
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => {
+                                setReturnId(r.rental_id);
+                                setError("");
+                                setMessage("");
+                                setFineResult(null);
+                              }}
+                            >
+                              Select for Return
+                            </Button>
+                          )}
+                          <Button 
+                            variant="destructive" 
+                            size="sm" 
+                            onClick={() => handleDeleteRental(r.rental_id)}
+                          >
+                            Delete
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {rentals.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={10} className="text-center py-6 text-slate-400">No rental agreements logged in the database.</TableCell>
+                      </TableRow>
+                    )}
+                  </>
                 )}
               </TableBody>
             </Table>
@@ -2678,6 +2823,7 @@ export const AnalyticsWorkspace = ({ userRole }: { userRole: string }) => {
   const [overdue, setOverdue] = useState<any[]>([]);
   const [growth, setGrowth] = useState<any[]>([]);
   const [margins, setMargins] = useState<any[]>([]);
+  const [vehicles, setVehicles] = useState<any[]>([]);
 
   const hasAccess = userRole === "Admin" || userRole === "Manager";
 
@@ -2702,6 +2848,13 @@ export const AnalyticsWorkspace = ({ userRole }: { userRole: string }) => {
         setGrowth(gData.performance || []);
       } catch (e: any) {
         console.warn("Sales growth restricted or failed:", e.message);
+      }
+
+      try {
+        const invData = await api.getInventory();
+        setVehicles(invData.inventory || []);
+      } catch (e: any) {
+        console.warn("Failed to fetch inventory for analytics:", e.message);
       }
 
       try {
@@ -2744,34 +2897,41 @@ export const AnalyticsWorkspace = ({ userRole }: { userRole: string }) => {
     ? (margins.reduce((sum: number, m: any) => sum + parseFloat(m.profit_margin_pct || 0), 0) / margins.length).toFixed(1)
     : "22.4"; // Standard fallback margin if non-admin or no data
 
-  // Dynamic coordinates for Vercel double-wave area chart
-  const wavePoints1 = [
-    { x: 50, y: 160 },
-    { x: 150, y: 130 },
-    { x: 250, y: 145 },
-    { x: 350, y: 80 },
-    { x: 450, y: 110 },
-    { x: 550, y: 60 },
-    { x: 650, y: 95 },
-    { x: 750, y: 40 }
-  ];
+  // 1. Group Showroom sales from commissions
+  const showroomSales: Record<string, { value: number; count: number }> = {};
+  commissions.forEach((c: any) => {
+    const name = c.showroom_name || "Unknown Showroom";
+    if (!showroomSales[name]) {
+      showroomSales[name] = { value: 0, count: 0 };
+    }
+    showroomSales[name].value += parseFloat(c.total_sales_value || 0);
+    showroomSales[name].count += parseInt(c.cars_sold || 0);
+  });
 
-  const wavePoints2 = [
-    { x: 50, y: 175 },
-    { x: 150, y: 150 },
-    { x: 250, y: 160 },
-    { x: 350, y: 110 },
-    { x: 450, y: 130 },
-    { x: 550, y: 90 },
-    { x: 650, y: 120 },
-    { x: 750, y: 65 }
-  ];
+  const showroomList = Object.entries(showroomSales).map(([name, data]) => ({
+    name,
+    value: data.value,
+    count: data.count,
+  }));
 
-  const pathD1 = wavePoints1.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
-  const areaD1 = `${pathD1} L 750 200 L 50 200 Z`;
+  // 2. Count Vehicle status values
+  const statusCounts = {
+    Available: 0,
+    Reserved: 0,
+    Sold: 0,
+    Rented: 0,
+    Service: 0,
+  };
+  vehicles.forEach((v: any) => {
+    const status = v.status as keyof typeof statusCounts;
+    if (statusCounts[status] !== undefined) {
+      statusCounts[status]++;
+    }
+  });
 
-  const pathD2 = wavePoints2.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
-  const areaD2 = `${pathD2} L 750 200 L 50 200 Z`;
+  const totalVehicles = vehicles.length;
+
+
 
   return (
     <div className="space-y-6">
@@ -2823,68 +2983,147 @@ export const AnalyticsWorkspace = ({ userRole }: { userRole: string }) => {
         </Card>
       </div>
 
-      {/* Vercel-Style SVG Area Chart */}
-      <Card className="shadow-sm border-slate-200">
-        <CardHeader className="flex flex-row items-center justify-between pb-6">
-          <div>
-            <CardTitle className="text-base font-bold text-slate-800">Dealership Sales Performance Trend</CardTitle>
-            <CardDescription className="text-xs text-slate-400">Monthly aggregate transactions value relative to projections.</CardDescription>
-          </div>
-          <div className="flex gap-1 border border-slate-200 rounded-md p-0.5 bg-slate-50">
-            <button className="text-[10px] font-semibold text-slate-600 px-2.5 py-1 rounded bg-white shadow-sm">Last 3 months</button>
-            <button className="text-[10px] font-semibold text-slate-400 px-2.5 py-1 hover:text-slate-600 transition-colors">Last 30 days</button>
-            <button className="text-[10px] font-semibold text-slate-400 px-2.5 py-1 hover:text-slate-600 transition-colors">Last 7 days</button>
-          </div>
-        </CardHeader>
-        <CardContent className="pb-6">
-          <div className="w-full h-56 relative">
-            <svg viewBox="0 0 800 220" width="100%" height="100%" className="overflow-visible">
-              <defs>
-                <linearGradient id="area-gradient-1" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="rgb(15, 23, 42)" stopOpacity="0.15" />
-                  <stop offset="100%" stopColor="rgb(15, 23, 42)" stopOpacity="0.0" />
-                </linearGradient>
-                <linearGradient id="area-gradient-2" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="rgb(148, 163, 184)" stopOpacity="0.08" />
-                  <stop offset="100%" stopColor="rgb(148, 163, 184)" stopOpacity="0.0" />
-                </linearGradient>
-              </defs>
+      {/* Graphics Row replacing Sales Performance Trend */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Showroom Branch Performance */}
+        <Card className="shadow-sm border-slate-200">
+          <CardHeader>
+            <CardTitle className="text-base font-bold text-slate-800">Showroom Branch Performance</CardTitle>
+            <CardDescription className="text-xs text-slate-400">Total sales unit volumes and operational metrics by branch location.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-2">
+            {showroomList.length === 0 ? (
+              <div className="text-center py-6 text-slate-400 text-xs">No showroom performance data available.</div>
+            ) : (
+              showroomList.map((sr, idx) => {
+                const maxVal = Math.max(...showroomList.map(s => s.value), 1);
+                const percent = (sr.value / maxVal) * 100;
+                return (
+                  <div key={idx} className="space-y-1">
+                    <div className="flex justify-between text-xs font-semibold text-slate-700">
+                      <span>{sr.name}</span>
+                      <span>{formatCurr(sr.value)} <span className="text-slate-400 font-normal">({sr.count} sold)</span></span>
+                    </div>
+                    <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-slate-900 rounded-full transition-all duration-500" 
+                        style={{ width: `${percent}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </CardContent>
+        </Card>
 
-              {/* Horizontal Gridlines */}
-              <line x1="50" y1="50" x2="750" y2="50" stroke="#f1f5f9" strokeWidth="1" />
-              <line x1="50" y1="100" x2="750" y2="100" stroke="#f1f5f9" strokeWidth="1" />
-              <line x1="50" y1="150" x2="750" y2="150" stroke="#f1f5f9" strokeWidth="1" />
-              <line x1="50" y1="200" x2="750" y2="200" stroke="#e2e8f0" strokeWidth="1.5" />
+        {/* Inventory Segment Breakdown */}
+        <Card className="shadow-sm border-slate-200">
+          <CardHeader>
+            <CardTitle className="text-base font-bold text-slate-800">Inventory Segment Breakdown</CardTitle>
+            <CardDescription className="text-xs text-slate-400">Real-time split of active fleet vehicles by operational status.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6 pt-2">
+            {totalVehicles === 0 ? (
+              <div className="text-center py-6 text-slate-400 text-xs">No inventory segment records available.</div>
+            ) : (
+              <div className="space-y-6">
+                {/* Stacked Composition Bar */}
+                <div className="h-4 w-full bg-slate-100 rounded-full overflow-hidden flex">
+                  {statusCounts.Available > 0 && (
+                    <div 
+                      className="h-full bg-emerald-500 transition-all duration-300" 
+                      style={{ width: `${(statusCounts.Available / totalVehicles) * 100}%` }}
+                      title={`Available: ${statusCounts.Available}`}
+                    />
+                  )}
+                  {statusCounts.Reserved > 0 && (
+                    <div 
+                      className="h-full bg-amber-500 transition-all duration-300" 
+                      style={{ width: `${(statusCounts.Reserved / totalVehicles) * 100}%` }}
+                      title={`Reserved: ${statusCounts.Reserved}`}
+                    />
+                  )}
+                  {statusCounts.Sold > 0 && (
+                    <div 
+                      className="h-full bg-blue-600 transition-all duration-300" 
+                      style={{ width: `${(statusCounts.Sold / totalVehicles) * 100}%` }}
+                      title={`Sold: ${statusCounts.Sold}`}
+                    />
+                  )}
+                  {statusCounts.Rented > 0 && (
+                    <div 
+                      className="h-full bg-purple-500 transition-all duration-300" 
+                      style={{ width: `${(statusCounts.Rented / totalVehicles) * 100}%` }}
+                      title={`Rented: ${statusCounts.Rented}`}
+                    />
+                  )}
+                  {statusCounts.Service > 0 && (
+                    <div 
+                      className="h-full bg-rose-500 transition-all duration-300" 
+                      style={{ width: `${(statusCounts.Service / totalVehicles) * 100}%` }}
+                      title={`Service: ${statusCounts.Service}`}
+                    />
+                  )}
+                </div>
 
-              {/* Wave 2 (Lower Lighter Wave) */}
-              <path d={areaD2} fill="url(#area-gradient-2)" />
-              <path d={pathD2} fill="none" stroke="rgb(148, 163, 184)" strokeWidth="1.5" strokeDasharray="3 3" />
+                {/* Status Legend Grid */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center justify-between p-2 bg-slate-50/50 rounded-lg border border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <div className="h-3 w-3 rounded-full bg-emerald-500" />
+                      <span className="text-xs font-semibold text-slate-700">Available</span>
+                    </div>
+                    <span className="text-xs font-bold text-slate-800">
+                      {statusCounts.Available} <span className="text-[10px] text-slate-400 font-normal">({((statusCounts.Available / totalVehicles) * 100).toFixed(0)}%)</span>
+                    </span>
+                  </div>
 
-              {/* Wave 1 (Upper Slate Wave) */}
-              <path d={areaD1} fill="url(#area-gradient-1)" />
-              <path d={pathD1} fill="none" stroke="rgb(15, 23, 42)" strokeWidth="2.5" />
+                  <div className="flex items-center justify-between p-2 bg-slate-50/50 rounded-lg border border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <div className="h-3 w-3 rounded-full bg-amber-500" />
+                      <span className="text-xs font-semibold text-slate-700">Reserved</span>
+                    </div>
+                    <span className="text-xs font-bold text-slate-800">
+                      {statusCounts.Reserved} <span className="text-[10px] text-slate-400 font-normal">({((statusCounts.Reserved / totalVehicles) * 100).toFixed(0)}%)</span>
+                    </span>
+                  </div>
 
-              {/* Active data nodes / highlights */}
-              {wavePoints1.map((p, idx) => (
-                <g key={idx} className="cursor-pointer group">
-                  <circle cx={p.x} cy={p.y} r="4" fill="white" stroke="rgb(15, 23, 42)" strokeWidth="2" className="transition-transform duration-200 hover:scale-150" />
-                  <title>Value index {idx + 1}</title>
-                </g>
-              ))}
+                  <div className="flex items-center justify-between p-2 bg-slate-50/50 rounded-lg border border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <div className="h-3 w-3 rounded-full bg-blue-600" />
+                      <span className="text-xs font-semibold text-slate-700">Sold</span>
+                    </div>
+                    <span className="text-xs font-bold text-slate-800">
+                      {statusCounts.Sold} <span className="text-[10px] text-slate-400 font-normal">({((statusCounts.Sold / totalVehicles) * 100).toFixed(0)}%)</span>
+                    </span>
+                  </div>
 
-              {/* X Axis Labels */}
-              <text x="50" y="218" textAnchor="middle" className="text-[10px] fill-slate-400 font-medium font-sans">Jan</text>
-              <text x="150" y="218" textAnchor="middle" className="text-[10px] fill-slate-400 font-medium font-sans">Feb</text>
-              <text x="250" y="218" textAnchor="middle" className="text-[10px] fill-slate-400 font-medium font-sans">Mar</text>
-              <text x="350" y="218" textAnchor="middle" className="text-[10px] fill-slate-400 font-medium font-sans">Apr</text>
-              <text x="450" y="218" textAnchor="middle" className="text-[10px] fill-slate-400 font-medium font-sans">May</text>
-              <text x="550" y="218" textAnchor="middle" className="text-[10px] fill-slate-400 font-medium font-sans">Jun</text>
-              <text x="650" y="218" textAnchor="middle" className="text-[10px] fill-slate-400 font-medium font-sans">Jul</text>
-              <text x="750" y="218" textAnchor="middle" className="text-[10px] fill-slate-400 font-medium font-sans">Aug</text>
-            </svg>
-          </div>
-        </CardContent>
-      </Card>
+                  <div className="flex items-center justify-between p-2 bg-slate-50/50 rounded-lg border border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <div className="h-3 w-3 rounded-full bg-purple-500" />
+                      <span className="text-xs font-semibold text-slate-700">Rented</span>
+                    </div>
+                    <span className="text-xs font-bold text-slate-800">
+                      {statusCounts.Rented} <span className="text-[10px] text-slate-400 font-normal">({((statusCounts.Rented / totalVehicles) * 100).toFixed(0)}%)</span>
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between p-2 bg-slate-50/50 rounded-lg border border-slate-100 col-span-2">
+                    <div className="flex items-center gap-2">
+                      <div className="h-3 w-3 rounded-full bg-rose-500" />
+                      <span className="text-xs font-semibold text-slate-700">In Service</span>
+                    </div>
+                    <span className="text-xs font-bold text-slate-800">
+                      {statusCounts.Service} <span className="text-[10px] text-slate-400 font-normal">({((statusCounts.Service / totalVehicles) * 100).toFixed(0)}%)</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Commissions summary */}
