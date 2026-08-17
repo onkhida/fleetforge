@@ -50,6 +50,8 @@ urlpatterns = [
     
     # Module 6: Service Bay
     path("api/service/jobs/", views.api_service_jobs, name="api_service_jobs"),
+    path("api/service/jobs/update/", views.api_service_job_update, name="api_service_job_update"),
+    path("api/service/jobs/delete/", views.api_service_job_delete, name="api_service_job_delete"),
     path("api/service/line-items/", views.api_service_line_items, name="api_service_line_items"),
     path("api/service/warranty-lookup/", views.api_service_warranty_lookup, name="api_service_warranty_lookup"),
     path("api/service/warranties/", views.api_service_warranties, name="api_service_warranties"),

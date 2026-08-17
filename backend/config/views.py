@@ -558,8 +558,78 @@ def api_service_jobs(request):
         return JsonResponse({"error": f"Transaction failed: {str(e)}"}, status=400)
 
 @csrf_exempt
+@require_role(["Admin", "Manager", "Technician"])
+def api_service_job_update(request):
+    """PUT /api/service/jobs/update/ - Update a service job's status or odometer."""
+    if request.method != "PUT":
+        return JsonResponse({"error": "Method not allowed."}, status=405)
+    data = get_post_data(request)
+    service_job_id = data.get("service_job_id")
+    status = data.get("status")
+    odometer_reading = data.get("odometer_reading")
+    
+    if not service_job_id:
+        return JsonResponse({"error": "service_job_id is required."}, status=400)
+        
+    try:
+        with connection.cursor() as cursor:
+            if status and odometer_reading:
+                cursor.execute(
+                    "UPDATE Service_Job SET status = %s, odometer_reading = %s WHERE service_job_id = %s",
+                    [status, odometer_reading, service_job_id]
+                )
+            elif status:
+                cursor.execute(
+                    "UPDATE Service_Job SET status = %s WHERE service_job_id = %s",
+                    [status, service_job_id]
+                )
+            elif odometer_reading:
+                cursor.execute(
+                    "UPDATE Service_Job SET odometer_reading = %s WHERE service_job_id = %s",
+                    [odometer_reading, service_job_id]
+                )
+            else:
+                return JsonResponse({"error": "Nothing to update."}, status=400)
+            return JsonResponse({"message": f"Service job #{service_job_id} successfully updated."})
+    except DatabaseError as e:
+        return JsonResponse({"error": f"Database error: {str(e)}"}, status=500)
+
+@csrf_exempt
+@require_role(["Admin", "Manager", "Technician"])
+def api_service_job_delete(request):
+    """DELETE /api/service/jobs/delete/?id=<id> - Remove/Decommission a service job."""
+    if request.method != "DELETE":
+        return JsonResponse({"error": "Method not allowed."}, status=405)
+    service_job_id = request.GET.get("id")
+    if not service_job_id:
+        return JsonResponse({"error": "Service job ID is required."}, status=400)
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("DELETE FROM Service_Line_Item WHERE service_job_id = %s", [service_job_id])
+            cursor.execute("DELETE FROM Service_Job WHERE service_job_id = %s", [service_job_id])
+            return JsonResponse({"message": f"Service job #{service_job_id} successfully deleted."})
+    except DatabaseError as e:
+        return JsonResponse({"error": f"Database error: {str(e)}"}, status=500)
+
+@csrf_exempt
 def api_service_line_items(request):
-    """POST /api/service/line-items/ - Append labor/parts task to an active work order."""
+    """GET /api/service/line-items/?service_job_id=<id> - List line items for a job; POST /api/service/line-items/ - Append labor/parts task."""
+    if request.method == "GET":
+        service_job_id = request.GET.get("service_job_id")
+        if not service_job_id:
+            return JsonResponse({"error": "service_job_id query parameter is required."}, status=400)
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT line_item_id, service_job_id, description, labor_cost, parts_cost, payor_type "
+                    "FROM Service_Line_Item WHERE service_job_id = %s",
+                    [service_job_id]
+                )
+                items = dictfetchall(cursor)
+                return JsonResponse({"line_items": items})
+        except DatabaseError as e:
+            return JsonResponse({"error": f"Database error: {str(e)}"}, status=500)
+
     if request.method != "POST":
         return JsonResponse({"error": "Method not allowed."}, status=405)
         
@@ -827,6 +897,7 @@ def api_employees_add(request):
         return JsonResponse({"error": f"Database error: {str(e)}"}, status=400)
 
 # 2. Showroom Management
+@require_role(["Admin", "Manager"])
 def api_showrooms_list(request):
     """GET /api/showrooms/ - List all showrooms."""
     if request.method != "GET":
@@ -865,7 +936,7 @@ def api_showrooms_add(request):
         return JsonResponse({"error": f"Database error: {str(e)}"}, status=400)
 
 # 3. Transaction Registries
-@require_role(["Admin", "Manager"])
+@require_role(["Admin", "Manager", "Finance"])
 def api_sales_list(request):
     """GET /api/sales/list/ - Query past vehicle sale records."""
     try:
@@ -886,7 +957,7 @@ def api_sales_list(request):
     except DatabaseError as e:
         return JsonResponse({"error": f"Database error: {str(e)}"}, status=500)
 
-@require_role(["Admin", "Manager"])
+@require_role(["Admin", "Manager", "Finance"])
 def api_finance_payments_list(request):
     """GET /api/finance/payments/list/ - Query all loan payment receipts."""
     try:

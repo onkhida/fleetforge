@@ -125,7 +125,7 @@ function App() {
                 <Sparkles className="h-4 w-4" />
               </div>
               <div>
-                <h1 className="text-sm font-bold text-slate-800 tracking-tight leading-none">Acme Motors</h1>
+                <h1 className="text-sm font-bold text-slate-800 tracking-tight leading-none">Apex Motors</h1>
                 <p className="text-[10px] text-slate-400 font-medium mt-0.5">{employee.showroom_name || "Apex Motors"}</p>
               </div>
             </div>

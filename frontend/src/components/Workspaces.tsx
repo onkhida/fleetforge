@@ -85,6 +85,8 @@ export const InventoryWorkspace = ({ employeeShowroomName }: { employeeShowroomN
 
   const [editShowroomForm, setEditShowroomForm] = useState<any>(null);
   const [editVehicleForm, setEditVehicleForm] = useState<any>(null);
+  const [isTransfersRestricted, setTransfersRestricted] = useState(false);
+  const [isShowroomsRestricted, setShowroomsRestricted] = useState(false);
 
   const handleUpdateShowroom = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,17 +154,33 @@ export const InventoryWorkspace = ({ employeeShowroomName }: { employeeShowroomN
     try {
       const invData = await api.getInventory();
       setVehicles(invData.inventory || []);
-      
-      const metricsData = await api.getMetrics();
-      setMetrics(metricsData.metrics || null);
-
-      const showroomsData = await api.getShowrooms();
-      setShowrooms(showroomsData.showrooms || []);
-
-      const transfersData = await api.getTransfers();
-      setTransfers(transfersData.transfers || []);
     } catch (e: any) {
       setError(e.message);
+    }
+
+    try {
+      const metricsData = await api.getMetrics();
+      setMetrics(metricsData.metrics || null);
+    } catch (e: any) {
+      console.warn("Metrics restricted or failed:", e.message);
+    }
+
+    try {
+      const showroomsData = await api.getShowrooms();
+      setShowrooms(showroomsData.showrooms || []);
+      setShowroomsRestricted(false);
+    } catch (e: any) {
+      console.warn("Showrooms restricted or failed:", e.message);
+      setShowroomsRestricted(true);
+    }
+
+    try {
+      const transfersData = await api.getTransfers();
+      setTransfers(transfersData.transfers || []);
+      setTransfersRestricted(false);
+    } catch (e: any) {
+      console.warn("Transfers restricted:", e.message);
+      setTransfersRestricted(true);
     }
   };
 
@@ -253,9 +271,20 @@ export const InventoryWorkspace = ({ employeeShowroomName }: { employeeShowroomN
     `${v.make} ${v.model} ${v.vin}`.toLowerCase().includes(search.toLowerCase())
   );
 
+  const isPrivilegeError = error && (error.includes("Forbidden") || error.includes("privilege"));
+
   return (
     <div className="space-y-6">
-      {error && <div className="p-4 bg-rose-50 text-rose-800 border border-rose-200 rounded-lg text-sm">{error}</div>}
+      {error && (
+        isPrivilegeError ? (
+          <div className="p-4 bg-amber-50 text-amber-800 border border-amber-200 rounded-lg text-sm flex items-center gap-2">
+            <Shield className="h-4 w-4 text-amber-600 shrink-0" />
+            <span>Restricted Access: Some operational controls on this page are limited based on your account role.</span>
+          </div>
+        ) : (
+          <div className="p-4 bg-rose-50 text-rose-800 border border-rose-200 rounded-lg text-sm">{error}</div>
+        )
+      )}
       {message && <div className="p-4 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-sm">{message}</div>}
 
       {/* Primary Actions Toolbar */}
@@ -339,85 +368,101 @@ export const InventoryWorkspace = ({ employeeShowroomName }: { employeeShowroomN
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Showroom Stock Transfers Approval Queue Table */}
-        <Card className="shadow-sm border-slate-200">
-          <CardHeader>
-            <CardTitle className="text-base font-bold text-slate-800">Showroom Stock Transfers Queue</CardTitle>
-            <CardDescription className="text-xs text-slate-400">Review pending transfers between dealership branches.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0 border-t border-slate-100">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>VIN</TableHead>
-                  <TableHead>Source</TableHead>
-                  <TableHead>Target</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {transfers.map((t: any) => (
-                  <TableRow key={t.transfer_id}>
-                    <TableCell className="font-mono text-xs">{t.vin}</TableCell>
-                    <TableCell>{t.source_showroom_name}</TableCell>
-                    <TableCell>{t.target_showroom_name}</TableCell>
-                    <TableCell>{getStatusBadge(t.status)}</TableCell>
-                    <TableCell className="text-right space-x-2">
-                      {t.status === "Pending" ? (
-                        <>
-                          <Button size="sm" variant="outline" className="text-emerald-600 hover:text-emerald-700 h-8" onClick={() => handleApproveTransfer(t.transfer_id)}>Approve</Button>
-                          <Button size="sm" variant="outline" className="text-rose-600 hover:text-rose-700 h-8" onClick={() => handleRejectTransfer(t.transfer_id)}>Reject</Button>
-                        </>
-                      ) : (
-                        <span className="text-xs text-slate-400 font-medium">—</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {transfers.length === 0 && (
+        {isTransfersRestricted ? (
+          <Card className="shadow-sm border-slate-200 bg-slate-50/50 flex flex-col justify-center items-center py-16 text-center border-dashed">
+            <Shield className="h-8 w-8 text-amber-500 mb-2" />
+            <h3 className="text-sm font-semibold text-slate-800">Showroom Transfers Restricted</h3>
+            <p className="text-xs text-slate-400 max-w-xs mt-1 px-4">Your role does not have authorization to view or manage inter-showroom logistics.</p>
+          </Card>
+        ) : (
+          <Card className="shadow-sm border-slate-200">
+            <CardHeader>
+              <CardTitle className="text-base font-bold text-slate-800">Showroom Stock Transfers Queue</CardTitle>
+              <CardDescription className="text-xs text-slate-400">Review pending transfers between dealership branches.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0 border-t border-slate-100">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-6 text-slate-400">No stock transfers logged in the database.</TableCell>
+                    <TableHead>VIN</TableHead>
+                    <TableHead>Source</TableHead>
+                    <TableHead>Target</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                </TableHeader>
+                <TableBody>
+                  {transfers.map((t: any) => (
+                    <TableRow key={t.transfer_id}>
+                      <TableCell className="font-mono text-xs">{t.vin}</TableCell>
+                      <TableCell>{t.source_showroom_name}</TableCell>
+                      <TableCell>{t.target_showroom_name}</TableCell>
+                      <TableCell>{getStatusBadge(t.status)}</TableCell>
+                      <TableCell className="text-right space-x-2">
+                        {t.status === "Pending" ? (
+                          <>
+                            <Button size="sm" variant="outline" className="text-emerald-600 hover:text-emerald-700 h-8" onClick={() => handleApproveTransfer(t.transfer_id)}>Approve</Button>
+                            <Button size="sm" variant="outline" className="text-rose-600 hover:text-rose-700 h-8" onClick={() => handleRejectTransfer(t.transfer_id)}>Reject</Button>
+                          </>
+                        ) : (
+                          <span className="text-xs text-slate-400 font-medium">—</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {transfers.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-6 text-slate-400">No stock transfers logged in the database.</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Showrooms Directory */}
-        <Card className="shadow-sm border-slate-200">
-          <CardHeader>
-            <CardTitle className="text-base font-bold text-slate-800">Showrooms Directory</CardTitle>
-            <CardDescription className="text-xs text-slate-400">List of registered active branch showroom locations.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0 border-t border-slate-100">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Showroom ID</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Address</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {showrooms.map((s: any) => (
-                  <TableRow key={s.showroom_id}>
-                    <TableCell className="font-semibold text-slate-800">Showroom #{s.showroom_id}</TableCell>
-                    <TableCell className="font-medium text-slate-800">{s.name}</TableCell>
-                    <TableCell className="text-slate-600 text-xs">{s.address}</TableCell>
-                    <TableCell className="text-slate-500 text-xs">{s.phone || s.email || "—"}</TableCell>
-                    <TableCell className="text-right space-x-2">
-                      <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setEditShowroomForm(s)}>Edit</Button>
-                      <Button size="sm" variant="destructive" className="h-8 text-xs" onClick={() => handleDeleteShowroom(s.showroom_id)}>Delete</Button>
-                    </TableCell>
+        {isShowroomsRestricted ? (
+          <Card className="shadow-sm border-slate-200 bg-slate-50/50 flex flex-col justify-center items-center py-16 text-center border-dashed">
+            <Shield className="h-8 w-8 text-amber-500 mb-2" />
+            <h3 className="text-sm font-semibold text-slate-800">Showrooms Directory Restricted</h3>
+            <p className="text-xs text-slate-400 max-w-xs mt-1 px-4">Your role does not have authorization to view showroom branches directory.</p>
+          </Card>
+        ) : (
+          <Card className="shadow-sm border-slate-200">
+            <CardHeader>
+              <CardTitle className="text-base font-bold text-slate-800">Showrooms Directory</CardTitle>
+              <CardDescription className="text-xs text-slate-400">List of registered active branch showroom locations.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0 border-t border-slate-100">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Showroom ID</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Address</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                </TableHeader>
+                <TableBody>
+                  {showrooms.map((s: any) => (
+                    <TableRow key={s.showroom_id}>
+                      <TableCell className="font-semibold text-slate-800">Showroom #{s.showroom_id}</TableCell>
+                      <TableCell className="font-medium text-slate-800">{s.name}</TableCell>
+                      <TableCell className="text-slate-600 text-xs">{s.address}</TableCell>
+                      <TableCell className="text-slate-500 text-xs">{s.phone || s.email || "—"}</TableCell>
+                      <TableCell className="text-right space-x-2">
+                        <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setEditShowroomForm(s)}>Edit</Button>
+                        <Button size="sm" variant="destructive" className="h-8 text-xs" onClick={() => handleDeleteShowroom(s.showroom_id)}>Delete</Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Transfer Dialog */}
@@ -661,6 +706,7 @@ export const CustomerWorkspace = () => {
   const [showrooms, setShowrooms] = useState<any[]>([]);
   const [hireForm, setHireForm] = useState({ first_name: "", last_name: "", email: "", phone: "", role: "Salesperson", showroom_id: "", commission_rate: "0.05" });
   const [hireDialogOpen, setHireDialogOpen] = useState(false);
+  const [isEmployeesRestricted, setEmployeesRestricted] = useState(false);
 
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -715,10 +761,17 @@ export const CustomerWorkspace = () => {
     try {
       const res = await api.getEmployees();
       setEmployees(res.employees || []);
+      setEmployeesRestricted(false);
+    } catch (err: any) {
+      console.warn("Employees restricted:", err.message);
+      setEmployeesRestricted(true);
+    }
+
+    try {
       const sRes = await api.getShowrooms();
       setShowrooms(sRes.showrooms || []);
     } catch (err: any) {
-      setError(err.message);
+      console.warn("Showrooms restricted in CustomerWorkspace:", err.message);
     }
   };
 
@@ -1057,60 +1110,68 @@ export const CustomerWorkspace = () => {
       </div>
 
       {/* Employee Directory Section (CRUD Table) */}
-      <Card className="lg:col-span-3 mt-6">
-        <CardHeader className="flex flex-row items-center justify-between pb-4 border-b border-slate-100">
-          <div>
-            <CardTitle className="text-base font-bold text-slate-800">Dealership Employee Directory</CardTitle>
-            <CardDescription className="text-xs text-slate-400">List of all active sales staff, managers, and service technicians.</CardDescription>
-          </div>
-          <Button onClick={() => setHireDialogOpen(true)}>Hire New Employee</Button>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Employee ID</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Showroom Branch</TableHead>
-                <TableHead>Commission Rate</TableHead>
-                <TableHead>Hire Date</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {employees.map((emp: any) => (
-                <TableRow key={emp.employee_id}>
-                  <TableCell className="font-semibold">Staff #{emp.employee_id}</TableCell>
-                  <TableCell className="font-medium text-slate-800">{emp.first_name} {emp.last_name}</TableCell>
-                  <TableCell className="text-xs text-slate-500">{emp.email}</TableCell>
-                  <TableCell>
-                    <Badge className="bg-slate-100 text-slate-800 border-slate-200 border font-normal capitalize">
-                      {emp.role}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-slate-600 text-xs">{emp.showroom_name}</TableCell>
-                  <TableCell className="font-medium">{Math.round(emp.commission_rate * 100)}%</TableCell>
-                  <TableCell className="text-xs text-slate-400">{emp.hire_date}</TableCell>
-                  <TableCell>
-                    {emp.is_active ? (
-                      <Badge className="bg-emerald-50 text-emerald-800 border-emerald-100 border font-normal">Active</Badge>
-                    ) : (
-                      <Badge className="bg-slate-100 text-slate-400 border-slate-200 border font-normal">Inactive</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right space-x-2">
-                    <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setEditEmployeeForm(emp)}>Edit</Button>
-                    <Button size="sm" variant="destructive" className="h-8 text-xs" onClick={() => handleDeleteEmployee(emp.employee_id)}>Delete</Button>
-                  </TableCell>
+      {isEmployeesRestricted ? (
+        <Card className="mt-6 bg-slate-50/50 flex flex-col justify-center items-center py-16 text-center border border-slate-200 border-dashed">
+          <Shield className="h-8 w-8 text-amber-500 mb-2" />
+          <h3 className="text-sm font-semibold text-slate-800">Employee Directory Restricted</h3>
+          <p className="text-xs text-slate-400 max-w-xs mt-1 px-4">Your role does not have authorization to view or manage employee registers.</p>
+        </Card>
+      ) : (
+        <Card className="lg:col-span-3 mt-6">
+          <CardHeader className="flex flex-row items-center justify-between pb-4 border-b border-slate-100">
+            <div>
+              <CardTitle className="text-base font-bold text-slate-800">Dealership Employee Directory</CardTitle>
+              <CardDescription className="text-xs text-slate-400">List of all active sales staff, managers, and service technicians.</CardDescription>
+            </div>
+            <Button onClick={() => setHireDialogOpen(true)}>Hire New Employee</Button>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Employee ID</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Showroom Branch</TableHead>
+                  <TableHead>Commission Rate</TableHead>
+                  <TableHead>Hire Date</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              </TableHeader>
+              <TableBody>
+                {employees.map((emp: any) => (
+                  <TableRow key={emp.employee_id}>
+                    <TableCell className="font-semibold">Staff #{emp.employee_id}</TableCell>
+                    <TableCell className="font-medium text-slate-800">{emp.first_name} {emp.last_name}</TableCell>
+                    <TableCell className="text-xs text-slate-500">{emp.email}</TableCell>
+                    <TableCell>
+                      <Badge className="bg-slate-100 text-slate-800 border-slate-200 border font-normal capitalize">
+                        {emp.role}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-slate-600 text-xs">{emp.showroom_name}</TableCell>
+                    <TableCell className="font-medium">{Math.round(emp.commission_rate * 100)}%</TableCell>
+                    <TableCell className="text-xs text-slate-400">{emp.hire_date}</TableCell>
+                    <TableCell>
+                      {emp.is_active ? (
+                        <Badge className="bg-emerald-55 text-emerald-805 border-emerald-105 border font-normal">Active</Badge>
+                      ) : (
+                        <Badge className="bg-slate-101 text-slate-405 border-slate-205 border font-normal">Inactive</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right space-x-2">
+                      <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setEditEmployeeForm(emp)}>Edit</Button>
+                      <Button size="sm" variant="destructive" className="h-8 text-xs" onClick={() => handleDeleteEmployee(emp.employee_id)}>Delete</Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Hire Employee Dialog */}
       <Dialog open={hireDialogOpen} onOpenChange={setHireDialogOpen}>
@@ -1356,13 +1417,16 @@ export const CheckoutWorkspace = () => {
   const [sales, setSales] = useState<any[]>([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [isSalesRestricted, setSalesRestricted] = useState(false);
 
   const fetchSales = async () => {
     try {
       const res = await api.getSalesRegistry();
       setSales(res.sales || []);
+      setSalesRestricted(false);
     } catch (e: any) {
-      setError(e.message);
+      console.warn("Sales ledger restricted:", e.message);
+      setSalesRestricted(true);
     }
   };
 
@@ -1527,45 +1591,53 @@ export const CheckoutWorkspace = () => {
 
         {/* Sales Ledger */}
         <div className="xl:col-span-2">
-          <Card className="h-full">
-            <CardHeader>
-              <CardTitle className="text-base font-bold text-slate-800">Dealership Sales Ledger</CardTitle>
-              <CardDescription className="text-xs text-slate-400">Registry of all past car checkouts and calculated staff commissions.</CardDescription>
-            </CardHeader>
-            <CardContent className="p-0 border-t border-slate-100">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Sale ID</TableHead>
-                    <TableHead>VIN</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Salesperson</TableHead>
-                    <TableHead>Sale Price</TableHead>
-                    <TableHead>Commission</TableHead>
-                    <TableHead>Date</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sales.map((s: any) => (
-                    <TableRow key={s.sale_id}>
-                      <TableCell className="font-semibold">Sale #{s.sale_id}</TableCell>
-                      <TableCell className="font-mono text-xs text-slate-600">{s.vin}</TableCell>
-                      <TableCell className="text-xs font-medium text-slate-800">{s.customer_first} {s.customer_last}</TableCell>
-                      <TableCell className="text-xs text-slate-600">{s.employee_first} {s.employee_last}</TableCell>
-                      <TableCell className="font-semibold text-slate-800">{formatCurr(s.final_price)}</TableCell>
-                      <TableCell className="text-emerald-700 font-medium">{formatCurr(s.commission_amount || 0)}</TableCell>
-                      <TableCell className="text-xs text-slate-400">{s.sale_date}</TableCell>
-                    </TableRow>
-                  ))}
-                  {sales.length === 0 && (
+          {isSalesRestricted ? (
+            <Card className="h-full bg-slate-50/50 flex flex-col justify-center items-center py-16 text-center border border-slate-200 border-dashed">
+              <Shield className="h-8 w-8 text-amber-500 mb-2" />
+              <h3 className="text-sm font-semibold text-slate-800">Sales Ledger Restricted</h3>
+              <p className="text-xs text-slate-400 max-w-xs mt-1 px-4">Your role does not have authorization to view sales ledgers or transaction logs.</p>
+            </Card>
+          ) : (
+            <Card className="h-full">
+              <CardHeader>
+                <CardTitle className="text-base font-bold text-slate-800">Dealership Sales Ledger</CardTitle>
+                <CardDescription className="text-xs text-slate-400">Registry of all past car checkouts and calculated staff commissions.</CardDescription>
+              </CardHeader>
+              <CardContent className="p-0 border-t border-slate-100">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-6 text-slate-400">No sale transactions logged in the database.</TableCell>
+                      <TableHead>Sale ID</TableHead>
+                      <TableHead>VIN</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Salesperson</TableHead>
+                      <TableHead>Sale Price</TableHead>
+                      <TableHead>Commission</TableHead>
+                      <TableHead>Date</TableHead>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {sales.map((s: any) => (
+                      <TableRow key={s.sale_id}>
+                        <TableCell className="font-semibold">Sale #{s.sale_id}</TableCell>
+                        <TableCell className="font-mono text-xs text-slate-600">{s.vin}</TableCell>
+                        <TableCell className="text-xs font-medium text-slate-800">{s.customer_first_name} {s.customer_last_name}</TableCell>
+                        <TableCell className="text-xs text-slate-500">{s.employee_first_name} {s.employee_last_name}</TableCell>
+                        <TableCell className="font-semibold">{formatCurr(s.final_price)}</TableCell>
+                        <TableCell className="font-semibold text-emerald-800">{formatCurr(s.commission_amount)}</TableCell>
+                        <TableCell className="text-xs text-slate-400">{s.sale_date}</TableCell>
+                      </TableRow>
+                    ))}
+                    {sales.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-6 text-slate-400">No sale transactions logged in the database.</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>
@@ -1584,13 +1656,17 @@ export const FinancingWorkspace = () => {
   
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [isLoansRestricted, setLoansRestricted] = useState(false);
+  const [isPaymentsRestricted, setPaymentsRestricted] = useState(false);
 
   const refreshLoans = async () => {
     try {
       const res = await api.getLoans();
       setLoans(res.loans || []);
+      setLoansRestricted(false);
     } catch (e: any) {
-      setError(e.message);
+      console.warn("Loans restricted:", e.message);
+      setLoansRestricted(true);
     }
   };
 
@@ -1598,8 +1674,10 @@ export const FinancingWorkspace = () => {
     try {
       const res = await api.getPaymentsRegistry();
       setPayments(res.payments || []);
+      setPaymentsRestricted(false);
     } catch (e: any) {
-      setError(e.message);
+      console.warn("Payments restricted:", e.message);
+      setPaymentsRestricted(true);
     }
   };
 
@@ -1689,100 +1767,116 @@ export const FinancingWorkspace = () => {
 
         {/* Active Financing Accounts Table */}
         <div className="lg:col-span-2">
-          <Card className="h-full">
-            <CardHeader>
-              <CardTitle className="text-base font-bold text-slate-800">Active Financing Portfolios</CardTitle>
-              <CardDescription className="text-xs text-slate-400">List of active vehicle loans, principal payments, and interest terms.</CardDescription>
-            </CardHeader>
-            <CardContent className="p-0 border-t border-slate-100">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Loan ID</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Principal Bal</TableHead>
-                    <TableHead>Down Payment</TableHead>
-                    <TableHead>Interest</TableHead>
-                    <TableHead>Term</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loans.map((loan: any) => (
-                    <TableRow key={loan.loan_id}>
-                      <TableCell className="font-semibold">Loan #{loan.loan_id}</TableCell>
-                      <TableCell className="font-medium text-slate-800">{loan.customer_first_name} {loan.customer_last_name}</TableCell>
-                      <TableCell className="font-semibold text-rose-600">{formatCurr(loan.principal_balance)}</TableCell>
-                      <TableCell>{formatCurr(loan.down_payment)}</TableCell>
-                      <TableCell>{loan.interest_rate}%</TableCell>
-                      <TableCell>{loan.term_months}mo</TableCell>
-                      <TableCell>{getStatusBadge(loan.status)}</TableCell>
-                      <TableCell className="text-right">
-                        {loan.status === "Active" ? (
-                          <Button size="sm" variant="outline" className="h-8" onClick={() => setPayLoanId(loan.loan_id)}>Log Payment</Button>
-                        ) : (
-                          <span className="text-xs text-slate-400 font-medium px-4">—</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {loans.length === 0 && (
+          {isLoansRestricted ? (
+            <Card className="h-full bg-slate-50/50 flex flex-col justify-center items-center py-16 text-center border border-slate-200 border-dashed">
+              <Shield className="h-8 w-8 text-amber-500 mb-2" />
+              <h3 className="text-sm font-semibold text-slate-800">Financing Portfolios Restricted</h3>
+              <p className="text-xs text-slate-400 max-w-xs mt-1 px-4">Your role does not have authorization to view active customer financing accounts.</p>
+            </Card>
+          ) : (
+            <Card className="h-full">
+              <CardHeader>
+                <CardTitle className="text-base font-bold text-slate-800">Active Financing Portfolios</CardTitle>
+                <CardDescription className="text-xs text-slate-400">List of active vehicle loans, principal payments, and interest terms.</CardDescription>
+              </CardHeader>
+              <CardContent className="p-0 border-t border-slate-100">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-6 text-slate-400">No active financing contracts logged.</TableCell>
+                      <TableHead>Loan ID</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Principal Bal</TableHead>
+                      <TableHead>Down Payment</TableHead>
+                      <TableHead>Interest</TableHead>
+                      <TableHead>Term</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {loans.map((loan: any) => (
+                      <TableRow key={loan.loan_id}>
+                        <TableCell className="font-semibold">Loan #{loan.loan_id}</TableCell>
+                        <TableCell className="font-medium text-slate-800">{loan.customer_first_name} {loan.customer_last_name}</TableCell>
+                        <TableCell className="font-semibold text-rose-600">{formatCurr(loan.principal_balance)}</TableCell>
+                        <TableCell>{formatCurr(loan.down_payment)}</TableCell>
+                        <TableCell>{loan.interest_rate}%</TableCell>
+                        <TableCell>{loan.term_months}mo</TableCell>
+                        <TableCell>{getStatusBadge(loan.status)}</TableCell>
+                        <TableCell className="text-right">
+                          {loan.status === "Active" ? (
+                            <Button size="sm" variant="outline" className="h-8" onClick={() => setPayLoanId(loan.loan_id)}>Log Payment</Button>
+                          ) : (
+                            <span className="text-xs text-slate-400 font-medium px-4">—</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {loans.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center py-6 text-slate-400">No active financing contracts logged.</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 
       {/* Installment Payment Ledger */}
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle className="text-base font-bold text-slate-800">Installment Payment Ledger</CardTitle>
-          <CardDescription className="text-xs text-slate-400">Ledger registry of financing installment receipts from customers.</CardDescription>
-        </CardHeader>
-        <CardContent className="p-0 border-t border-slate-100">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Payment ID</TableHead>
-                <TableHead>Loan ID</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Method</TableHead>
-                <TableHead>Date Logged</TableHead>
-                <TableHead>Receipt Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {payments.map((p: any) => (
-                <TableRow key={p.payment_id}>
-                  <TableCell className="font-semibold">Receipt #{p.payment_id}</TableCell>
-                  <TableCell className="font-semibold">Loan #{p.loan_id}</TableCell>
-                  <TableCell className="font-medium text-slate-800">{p.customer_first} {p.customer_last}</TableCell>
-                  <TableCell className="font-semibold text-emerald-800">{formatCurr(p.amount)}</TableCell>
-                  <TableCell className="capitalize text-slate-600 text-xs">{p.payment_method.replace("_", " ")}</TableCell>
-                  <TableCell className="text-xs text-slate-400">{p.payment_date}</TableCell>
-                  <TableCell>
-                    <Badge className="bg-emerald-50 text-emerald-800 border-emerald-100 border font-normal">
-                      {p.receipt_status}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {payments.length === 0 && (
+      {isPaymentsRestricted ? (
+        <Card className="mt-6 bg-slate-50/50 flex flex-col justify-center items-center py-16 text-center border border-slate-200 border-dashed">
+          <Shield className="h-8 w-8 text-amber-500 mb-2" />
+          <h3 className="text-sm font-semibold text-slate-800">Payment Ledger Restricted</h3>
+          <p className="text-xs text-slate-400 max-w-xs mt-1 px-4">Your role does not have authorization to view customer installment receipt logs.</p>
+        </Card>
+      ) : (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="text-base font-bold text-slate-800">Installment Payment Ledger</CardTitle>
+            <CardDescription className="text-xs text-slate-400">Ledger registry of financing installment receipts from customers.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0 border-t border-slate-100">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-6 text-slate-400">No payment receipts logged in the database.</TableCell>
+                  <TableHead>Payment ID</TableHead>
+                  <TableHead>Loan ID</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Method</TableHead>
+                  <TableHead>Date Logged</TableHead>
+                  <TableHead>Receipt Status</TableHead>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              </TableHeader>
+              <TableBody>
+                {payments.map((p: any) => (
+                  <TableRow key={p.payment_id}>
+                    <TableCell className="font-semibold">Receipt #{p.payment_id}</TableCell>
+                    <TableCell className="font-semibold">Loan #{p.loan_id}</TableCell>
+                    <TableCell className="font-medium text-slate-800">{p.customer_first} {p.customer_last}</TableCell>
+                    <TableCell className="font-semibold text-emerald-800">{formatCurr(p.amount)}</TableCell>
+                    <TableCell className="capitalize text-slate-600 text-xs">{p.payment_method.replace("_", " ")}</TableCell>
+                    <TableCell className="text-xs text-slate-400">{p.payment_date}</TableCell>
+                    <TableCell>
+                      <Badge className="bg-emerald-50 text-emerald-800 border-emerald-100 border font-normal">
+                        {p.receipt_status}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {payments.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-6 text-slate-400">No payment receipts logged in the database.</TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Payment Dialog */}
       <Dialog open={payLoanId !== null} onOpenChange={(open) => !open && setPayLoanId(null)}>
@@ -1819,13 +1913,19 @@ export const FinancingWorkspace = () => {
 };
 const ServiceJobsList = ({ onRefreshNeeded }: { onRefreshNeeded?: () => void }) => {
   const [jobs, setJobs] = useState<any[]>([]);
+  const [isRestricted, setRestricted] = useState(false);
+  const [editJobForm, setEditJobForm] = useState<any>(null);
+  const [activeJobId, setActiveJobId] = useState<number | null>(null);
+  const [selectedJobItems, setSelectedJobItems] = useState<any[] | null>(null);
 
   const fetchJobs = async () => {
     try {
       const res = await api.getJobs();
       setJobs(res.jobs || []);
-    } catch (e) {
-      console.error(e);
+      setRestricted(false);
+    } catch (e: any) {
+      console.warn("Jobs restricted:", e.message);
+      setRestricted(true);
     }
   };
 
@@ -1833,40 +1933,184 @@ const ServiceJobsList = ({ onRefreshNeeded }: { onRefreshNeeded?: () => void }) 
     fetchJobs();
   }, [onRefreshNeeded]);
 
+  const handleViewItems = async (jobId: number) => {
+    setActiveJobId(jobId);
+    setSelectedJobItems(null);
+    try {
+      const res = await api.getLineItems(jobId);
+      setSelectedJobItems(res.line_items || []);
+    } catch (e) {
+      console.error("Failed to load line items:", e);
+      setSelectedJobItems([]);
+    }
+  };
+
+  const handleUpdateJobSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editJobForm) return;
+    try {
+      await api.updateJob({
+        service_job_id: editJobForm.service_job_id,
+        status: editJobForm.status,
+        odometer_reading: editJobForm.odometer_reading,
+      });
+      setEditJobForm(null);
+      fetchJobs();
+      if (onRefreshNeeded) onRefreshNeeded();
+    } catch (err: any) {
+      alert("Failed to update job: " + err.message);
+    }
+  };
+
+  const handleDeleteJob = async (id: number) => {
+    if (!confirm(`Are you sure you want to delete service job #${id}?`)) return;
+    try {
+      await api.deleteJob(id);
+      fetchJobs();
+      if (onRefreshNeeded) onRefreshNeeded();
+    } catch (err: any) {
+      alert("Failed to delete job: " + err.message);
+    }
+  };
+
+  if (isRestricted) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center bg-slate-50/50 rounded-lg border border-dashed border-slate-200 m-4">
+        <Shield className="h-8 w-8 text-amber-500 mb-2" />
+        <h3 className="text-sm font-semibold text-slate-800">Service Queue Restricted</h3>
+        <p className="text-xs text-slate-400 max-w-xs mt-1 px-4">Your role does not have authorization to view active service jobs.</p>
+      </div>
+    );
+  }
+
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Job ID</TableHead>
-          <TableHead>VIN</TableHead>
-          <TableHead>Customer</TableHead>
-          <TableHead>Technician</TableHead>
-          <TableHead>Showroom</TableHead>
-          <TableHead>Odometer</TableHead>
-          <TableHead>Total Cost</TableHead>
-          <TableHead>Status</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {jobs.map((j: any) => (
-          <TableRow key={j.service_job_id}>
-            <TableCell className="font-semibold">Job #{j.service_job_id}</TableCell>
-            <TableCell className="font-mono text-xs text-slate-600">{j.vin}</TableCell>
-            <TableCell className="text-xs font-medium text-slate-800">{j.customer_first} {j.customer_last}</TableCell>
-            <TableCell className="text-xs text-slate-600">{j.employee_first} {j.employee_last}</TableCell>
-            <TableCell className="text-xs text-slate-500">{j.showroom_name}</TableCell>
-            <TableCell className="text-xs">{j.odometer_reading.toLocaleString()} mi</TableCell>
-            <TableCell className="font-semibold text-slate-800">{formatCurr(j.total_cost || 0)}</TableCell>
-            <TableCell>{getStatusBadge(j.status)}</TableCell>
-          </TableRow>
-        ))}
-        {jobs.length === 0 && (
-          <TableRow>
-            <TableCell colSpan={8} className="text-center py-6 text-slate-400">No active service orders in queue.</TableCell>
-          </TableRow>
-        )}
-      </TableBody>
-    </Table>
+    <div className="relative">
+      <div className="overflow-x-auto w-full">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Job ID</TableHead>
+              <TableHead>VIN</TableHead>
+              <TableHead>Customer</TableHead>
+              <TableHead>Technician</TableHead>
+              <TableHead>Showroom</TableHead>
+              <TableHead>Odometer</TableHead>
+              <TableHead>Total Cost</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {jobs.map((j: any) => (
+              <TableRow key={j.service_job_id}>
+                <TableCell className="font-semibold">Job #{j.service_job_id}</TableCell>
+                <TableCell className="font-mono text-xs text-slate-600">{j.vin}</TableCell>
+                <TableCell className="text-xs font-medium text-slate-800">{j.customer_first} {j.customer_last}</TableCell>
+                <TableCell className="text-xs text-slate-600">{j.employee_first} {j.employee_last}</TableCell>
+                <TableCell className="text-xs text-slate-500">{j.showroom_name}</TableCell>
+                <TableCell className="text-xs">{j.odometer_reading.toLocaleString()} mi</TableCell>
+                <TableCell className="font-semibold text-slate-800">{formatCurr(j.total_cost || 0)}</TableCell>
+                <TableCell>{getStatusBadge(j.status)}</TableCell>
+                <TableCell className="text-right space-x-2">
+                  <Button size="sm" variant="outline" className="h-8 text-xs text-blue-600 hover:text-blue-700" onClick={() => handleViewItems(j.service_job_id)}>View Items</Button>
+                  <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setEditJobForm(j)}>Edit</Button>
+                  <Button size="sm" variant="destructive" className="h-8 text-xs" onClick={() => handleDeleteJob(j.service_job_id)}>Delete</Button>
+                </TableCell>
+              </TableRow>
+            ))}
+            {jobs.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={9} className="text-center py-6 text-slate-400">No active service orders in queue.</TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Edit Job Dialog */}
+      <Dialog open={editJobForm !== null} onOpenChange={(open) => !open && setEditJobForm(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Service Work Order</DialogTitle>
+            <DialogDescription>Update status or odometer reading for Service Job #{editJobForm?.service_job_id}</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleUpdateJobSubmit} className="space-y-4 py-2">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-700">Odometer Reading (mi)</label>
+              <Input 
+                type="number" 
+                required 
+                value={editJobForm?.odometer_reading || ""} 
+                onChange={(e) => setEditJobForm({ ...editJobForm, odometer_reading: parseInt(e.target.value) })} 
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-700">Job Status</label>
+              <Select 
+                value={editJobForm?.status || "In_Progress"} 
+                onValueChange={(val) => setEditJobForm({ ...editJobForm, status: val })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="In_Progress">In Progress</SelectItem>
+                  <SelectItem value="Completed">Completed</SelectItem>
+                  <SelectItem value="Deferred">Deferred</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" type="button" onClick={() => setEditJobForm(null)}>Cancel</Button>
+              <Button type="submit">Save Changes</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Items Dialog */}
+      <Dialog open={activeJobId !== null} onOpenChange={(open) => !open && setActiveJobId(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Service Line Items (Job #{activeJobId})</DialogTitle>
+            <DialogDescription>Detailed labor and parts task log for this ticket.</DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            {selectedJobItems === null ? (
+              <p className="text-sm text-slate-500 text-center py-4">Loading service items...</p>
+            ) : selectedJobItems.length === 0 ? (
+              <p className="text-sm text-slate-500 text-center py-4">No line items logged for this service ticket.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Task / Part</TableHead>
+                    <TableHead>Labor Cost</TableHead>
+                    <TableHead>Parts Cost</TableHead>
+                    <TableHead>Payor</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {selectedJobItems.map((item: any) => (
+                    <TableRow key={item.line_item_id}>
+                      <TableCell className="font-medium text-slate-800">{item.description}</TableCell>
+                      <TableCell>{formatCurr(item.labor_cost)}</TableCell>
+                      <TableCell>{formatCurr(item.parts_cost)}</TableCell>
+                      <TableCell className="capitalize text-slate-500 text-xs">{item.payor_type.replace(/_/g, " ")}</TableCell>
+                      <TableCell className="text-right font-bold text-slate-800">
+                        {formatCurr(parseFloat(item.labor_cost) + parseFloat(item.parts_cost))}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setActiveJobId(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 };
 
@@ -1880,15 +2124,26 @@ export const ServiceWorkspace = () => {
   const [allClaims, setAllClaims] = useState<any[]>([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [isWarrantiesRestricted, setWarrantiesRestricted] = useState(false);
+  const [isClaimsRestricted, setClaimsRestricted] = useState(false);
 
   const fetchWarrantiesAndClaims = async () => {
     try {
       const wRes = await api.getWarranties();
       setAllWarranties(wRes.warranties || []);
+      setWarrantiesRestricted(false);
+    } catch (e: any) {
+      console.warn("Warranties restricted:", e.message);
+      setWarrantiesRestricted(true);
+    }
+
+    try {
       const cRes = await api.getWarrantyClaims();
       setAllClaims(cRes.warranty_claims || []);
+      setClaimsRestricted(false);
     } catch (e: any) {
-      setError(e.message);
+      console.warn("Claims restricted:", e.message);
+      setClaimsRestricted(true);
     }
   };
 
@@ -2057,81 +2312,97 @@ export const ServiceWorkspace = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 col-span-1 lg:col-span-3">
-        <Card className="shadow-sm border-slate-200">
-          <CardHeader>
-            <CardTitle className="text-base font-bold text-slate-800">Dealership Warranties Ledger</CardTitle>
-            <CardDescription className="text-xs text-slate-400">All registered warranty coverages across the fleet.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0 border-t border-slate-100">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Warranty ID</TableHead>
-                  <TableHead>VIN</TableHead>
-                  <TableHead>Provider</TableHead>
-                  <TableHead>Coverage</TableHead>
-                  <TableHead>Mileage Limit</TableHead>
-                  <TableHead>Expires</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {allWarranties.map((w: any) => (
-                  <TableRow key={w.warranty_id}>
-                    <TableCell className="font-semibold">Contract #{w.warranty_id}</TableCell>
-                    <TableCell className="font-mono text-xs text-slate-600">{w.vin}</TableCell>
-                    <TableCell className="font-medium text-slate-800">{w.provider}</TableCell>
-                    <TableCell className="text-xs">{w.coverage_type}</TableCell>
-                    <TableCell className="text-xs">{w.mileage_limit.toLocaleString()} mi</TableCell>
-                    <TableCell className="text-xs text-slate-400">{w.end_date}</TableCell>
-                  </TableRow>
-                ))}
-                {allWarranties.length === 0 && (
+        {isWarrantiesRestricted ? (
+          <Card className="shadow-sm border-slate-200 bg-slate-50/50 flex flex-col justify-center items-center py-16 text-center border-dashed">
+            <Shield className="h-8 w-8 text-amber-500 mb-2" />
+            <h3 className="text-sm font-semibold text-slate-800">Warranties Directory Restricted</h3>
+            <p className="text-xs text-slate-400 max-w-xs mt-1 px-4">Your role does not have authorization to view fleet warranty coverages.</p>
+          </Card>
+        ) : (
+          <Card className="shadow-sm border-slate-200">
+            <CardHeader>
+              <CardTitle className="text-base font-bold text-slate-800">Dealership Warranties Ledger</CardTitle>
+              <CardDescription className="text-xs text-slate-400">All registered warranty coverages across the fleet.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0 border-t border-slate-100">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-6 text-slate-400">No warranties registered in the database.</TableCell>
+                    <TableHead>Warranty ID</TableHead>
+                    <TableHead>VIN</TableHead>
+                    <TableHead>Provider</TableHead>
+                    <TableHead>Coverage</TableHead>
+                    <TableHead>Mileage Limit</TableHead>
+                    <TableHead>Expires</TableHead>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                </TableHeader>
+                <TableBody>
+                  {allWarranties.map((w: any) => (
+                    <TableRow key={w.warranty_id}>
+                      <TableCell className="font-semibold">Contract #{w.warranty_id}</TableCell>
+                      <TableCell className="font-mono text-xs text-slate-600">{w.vin}</TableCell>
+                      <TableCell className="font-medium text-slate-800">{w.provider}</TableCell>
+                      <TableCell className="text-xs">{w.coverage_type}</TableCell>
+                      <TableCell className="text-xs">{w.mileage_limit.toLocaleString()} mi</TableCell>
+                      <TableCell className="text-xs text-slate-400">{w.end_date}</TableCell>
+                    </TableRow>
+                  ))}
+                  {allWarranties.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-6 text-slate-400">No warranties registered in the database.</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
 
-        <Card className="shadow-sm border-slate-200">
-          <CardHeader>
-            <CardTitle className="text-base font-bold text-slate-800">Warranty Claims Register</CardTitle>
-            <CardDescription className="text-xs text-slate-400">All submitted line item claims under active manufacturer warranties.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0 border-t border-slate-100">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Claim ID</TableHead>
-                  <TableHead>Warranty Provider</TableHead>
-                  <TableHead>Repair Item</TableHead>
-                  <TableHead>Amount Claimed</TableHead>
-                  <TableHead>Claim Date</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {allClaims.map((wc: any) => (
-                  <TableRow key={wc.claim_id}>
-                    <TableCell className="font-semibold">Claim #{wc.claim_id}</TableCell>
-                    <TableCell className="font-medium text-slate-800">{wc.warranty_provider}</TableCell>
-                    <TableCell className="text-xs text-slate-600">{wc.line_item_description}</TableCell>
-                    <TableCell className="font-semibold text-emerald-800">{formatCurr(wc.amount_claimed)}</TableCell>
-                    <TableCell className="text-xs text-slate-400">{wc.claim_date}</TableCell>
-                    <TableCell>{getStatusBadge(wc.status)}</TableCell>
-                  </TableRow>
-                ))}
-                {allClaims.length === 0 && (
+        {isClaimsRestricted ? (
+          <Card className="shadow-sm border-slate-200 bg-slate-50/50 flex flex-col justify-center items-center py-16 text-center border-dashed">
+            <Shield className="h-8 w-8 text-amber-500 mb-2" />
+            <h3 className="text-sm font-semibold text-slate-800">Warranty Claims Restricted</h3>
+            <p className="text-xs text-slate-400 max-w-xs mt-1 px-4">Your role does not have authorization to view submitted warranty claim logs.</p>
+          </Card>
+        ) : (
+          <Card className="shadow-sm border-slate-200">
+            <CardHeader>
+              <CardTitle className="text-base font-bold text-slate-800">Warranty Claims Register</CardTitle>
+              <CardDescription className="text-xs text-slate-400">All submitted line item claims under active manufacturer warranties.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0 border-t border-slate-100">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-6 text-slate-400">No warranty claims logged in the database.</TableCell>
+                    <TableHead>Claim ID</TableHead>
+                    <TableHead>Warranty Provider</TableHead>
+                    <TableHead>Repair Item</TableHead>
+                    <TableHead>Amount Claimed</TableHead>
+                    <TableHead>Claim Date</TableHead>
+                    <TableHead>Status</TableHead>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                </TableHeader>
+                <TableBody>
+                  {allClaims.map((wc: any) => (
+                    <TableRow key={wc.claim_id}>
+                      <TableCell className="font-semibold">Claim #{wc.claim_id}</TableCell>
+                      <TableCell className="font-medium text-slate-800">{wc.warranty_provider}</TableCell>
+                      <TableCell className="text-xs text-slate-600">{wc.line_item_description}</TableCell>
+                      <TableCell className="font-semibold text-emerald-800">{formatCurr(wc.amount_claimed)}</TableCell>
+                      <TableCell className="text-xs text-slate-400">{wc.claim_date}</TableCell>
+                      <TableCell>{getStatusBadge(wc.status)}</TableCell>
+                    </TableRow>
+                  ))}
+                  {allClaims.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-6 text-slate-400">No warranty claims logged in the database.</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
@@ -2152,13 +2423,16 @@ export const RentalWorkspace = () => {
   const [rentals, setRentals] = useState<any[]>([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [isRentalsRestricted, setRentalsRestricted] = useState(false);
 
   const fetchRentals = async () => {
     try {
       const res = await api.getRentals();
       setRentals(res.rentals || []);
+      setRentalsRestricted(false);
     } catch (err: any) {
-      setError(err.message);
+      console.warn("Rentals restricted:", err.message);
+      setRentalsRestricted(true);
     }
   };
 
@@ -2317,73 +2591,81 @@ export const RentalWorkspace = () => {
       </div>
 
       {/* List of Rental Agreements (CRUD Table) */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Active & Historic Rental Agreements</CardTitle>
-          <CardDescription>View, select for return check-in, or delete lease contracts from the database.</CardDescription>
-        </CardHeader>
-        <CardContent className="p-0 border-t border-slate-100">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Rental ID</TableHead>
-                <TableHead>Vehicle VIN</TableHead>
-                <TableHead>Customer ID</TableHead>
-                <TableHead>Start Date</TableHead>
-                <TableHead>Expected End Date</TableHead>
-                <TableHead>Return Date</TableHead>
-                <TableHead>Daily Rate</TableHead>
-                <TableHead>Late Fine</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rentals.map((r: any) => (
-                <TableRow key={r.rental_id}>
-                  <TableCell className="font-semibold">#{r.rental_id}</TableCell>
-                  <TableCell className="font-mono text-xs">{r.vin}</TableCell>
-                  <TableCell>Customer #{r.customer_id}</TableCell>
-                  <TableCell>{r.start_date}</TableCell>
-                  <TableCell>{r.expected_end_date}</TableCell>
-                  <TableCell>{r.actual_return_date || "—"}</TableCell>
-                  <TableCell>{formatCurr(r.daily_rate)}</TableCell>
-                  <TableCell>{r.late_fine_amount ? formatCurr(r.late_fine_amount) : "₵0.00"}</TableCell>
-                  <TableCell>{getStatusBadge(r.status)}</TableCell>
-                  <TableCell className="text-right space-x-2">
-                    {r.status !== "Returned" && (
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => {
-                          setReturnId(r.rental_id);
-                          setError("");
-                          setMessage("");
-                          setFineResult(null);
-                        }}
-                      >
-                        Select for Return
-                      </Button>
-                    )}
-                    <Button 
-                      variant="destructive" 
-                      size="sm" 
-                      onClick={() => handleDeleteRental(r.rental_id)}
-                    >
-                      Delete
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {rentals.length === 0 && (
+      {isRentalsRestricted ? (
+        <Card className="mt-6 bg-slate-50/50 flex flex-col justify-center items-center py-16 text-center border border-slate-200 border-dashed">
+          <Shield className="h-8 w-8 text-amber-500 mb-2" />
+          <h3 className="text-sm font-semibold text-slate-800">Rental Agreements Restricted</h3>
+          <p className="text-xs text-slate-400 max-w-xs mt-1 px-4">Your role does not have authorization to view active or historic lease contracts.</p>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>Active & Historic Rental Agreements</CardTitle>
+            <CardDescription>View, select for return check-in, or delete lease contracts from the database.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0 border-t border-slate-100">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-6 text-slate-400">No rental agreements logged in the database.</TableCell>
+                  <TableHead>Rental ID</TableHead>
+                  <TableHead>Vehicle VIN</TableHead>
+                  <TableHead>Customer ID</TableHead>
+                  <TableHead>Start Date</TableHead>
+                  <TableHead>Expected End Date</TableHead>
+                  <TableHead>Return Date</TableHead>
+                  <TableHead>Daily Rate</TableHead>
+                  <TableHead>Late Fine</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              </TableHeader>
+              <TableBody>
+                {rentals.map((r: any) => (
+                  <TableRow key={r.rental_id}>
+                    <TableCell className="font-semibold">#{r.rental_id}</TableCell>
+                    <TableCell className="font-mono text-xs">{r.vin}</TableCell>
+                    <TableCell>Customer #{r.customer_id}</TableCell>
+                    <TableCell>{r.start_date}</TableCell>
+                    <TableCell>{r.expected_end_date}</TableCell>
+                    <TableCell>{r.actual_return_date || "—"}</TableCell>
+                    <TableCell>{formatCurr(r.daily_rate)}</TableCell>
+                    <TableCell>{r.late_fine_amount ? formatCurr(r.late_fine_amount) : "₵0.00"}</TableCell>
+                    <TableCell>{getStatusBadge(r.status)}</TableCell>
+                    <TableCell className="text-right space-x-2">
+                      {r.status !== "Returned" && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => {
+                            setReturnId(r.rental_id);
+                            setError("");
+                            setMessage("");
+                            setFineResult(null);
+                          }}
+                        >
+                          Select for Return
+                        </Button>
+                      )}
+                      <Button 
+                        variant="destructive" 
+                        size="sm" 
+                        onClick={() => handleDeleteRental(r.rental_id)}
+                      >
+                        Delete
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {rentals.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={10} className="text-center py-6 text-slate-400">No rental agreements logged in the database.</TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
@@ -2396,30 +2678,63 @@ export const AnalyticsWorkspace = ({ userRole }: { userRole: string }) => {
   const [overdue, setOverdue] = useState<any[]>([]);
   const [growth, setGrowth] = useState<any[]>([]);
   const [margins, setMargins] = useState<any[]>([]);
-  const [error, setError] = useState("");
+
+  const hasAccess = userRole === "Admin" || userRole === "Manager";
 
   useEffect(() => {
     const fetchAnalytics = async () => {
       try {
         const cData = await api.getCommissions();
         setCommissions(cData.commissions || []);
+      } catch (e: any) {
+        console.warn("Commissions restricted or failed:", e.message);
+      }
 
+      try {
         const oData = await api.getOverdueRentals();
         setOverdue(oData.overdue_rentals || []);
+      } catch (e: any) {
+        console.warn("Overdue rentals restricted or failed:", e.message);
+      }
 
+      try {
         const gData = await api.getSalesGrowth();
         setGrowth(gData.performance || []);
+      } catch (e: any) {
+        console.warn("Sales growth restricted or failed:", e.message);
+      }
 
+      try {
         if (userRole === "Admin") {
           const mData = await api.getProfitMargins();
           setMargins(mData.profit_margins || []);
         }
       } catch (e: any) {
-        setError(e.message);
+        console.warn("Profit margins restricted or failed:", e.message);
       }
     };
-    fetchAnalytics();
-  }, [userRole]);
+    if (hasAccess) {
+      fetchAnalytics();
+    }
+  }, [userRole, hasAccess]);
+
+  if (!hasAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <Card className="max-w-md w-full shadow-sm border border-slate-200">
+          <CardContent className="flex flex-col items-center justify-center p-8">
+            <div className="h-12 w-12 rounded-full bg-amber-50 flex items-center justify-center mb-4">
+              <Shield className="h-6 w-6 text-amber-600 animate-pulse" />
+            </div>
+            <CardTitle className="text-lg font-bold text-slate-800">Executive Analytics Restricted</CardTitle>
+            <CardDescription className="text-xs text-slate-400 mt-2 max-w-xs leading-normal">
+              Your active account role (<strong>{userRole}</strong>) does not have authorization to query dealership revenue records, sales commissions, or profit margin tables.
+            </CardDescription>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   // Compute metrics dynamically from database queries
   const totalRevenue = commissions.reduce((sum: number, c: any) => sum + parseFloat(c.total_sales_value || 0), 0);
@@ -2460,7 +2775,6 @@ export const AnalyticsWorkspace = ({ userRole }: { userRole: string }) => {
 
   return (
     <div className="space-y-6">
-      {error && <div className="p-4 bg-rose-50 text-rose-800 border border-rose-200 rounded-lg text-sm">{error}</div>}
 
       {/* Modern 4-Cards KPI Grid */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

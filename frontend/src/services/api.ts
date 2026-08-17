@@ -92,6 +92,12 @@ export const api = {
     odometer_reading: number;
   }) => request("POST", "/api/service/jobs/", payload),
   getJobs: () => request("GET", "/api/service/jobs/"),
+  updateJob: (payload: {
+    service_job_id: number;
+    status?: string;
+    odometer_reading?: number;
+  }) => request("PUT", "/api/service/jobs/update/", payload),
+  deleteJob: (id: number) => request("DELETE", `/api/service/jobs/delete/?id=${id}`),
   addLineItem: (payload: {
     service_job_id: number;
     description: string;
@@ -99,6 +105,8 @@ export const api = {
     parts_cost: number;
     payor_type: string;
   }) => request("POST", "/api/service/line-items/", payload),
+  getLineItems: (service_job_id: number) => 
+    request("GET", `/api/service/line-items/?service_job_id=${service_job_id}`),
   warrantyLookup: (vin: string, mileage: number) => 
     request("GET", `/api/service/warranty-lookup/?vin=${vin}&mileage=${mileage}`),
 
